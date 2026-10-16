@@ -12,33 +12,21 @@
             user-select: none; -webkit-user-select: none;
             touch-action: none; font-family: system-ui, sans-serif;
         }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-        #info-panel {
-            position: fixed; top: 16px; left: 16px; z-index: 20;
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        #loading {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #fff; font-size: 18px; z-index: 1000;
+            background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px;
+        }
+        #info {
+            position: fixed; top: 16px; left: 16px; z-index: 100;
             color: #fff; background: rgba(0,0,0,0.7);
             border-radius: 12px; padding: 12px 16px;
             font: 12px system-ui, sans-serif; backdrop-filter: blur(10px);
         }
-        #shape-name {
-            font-size: 14px; font-weight: 600;
-            background: linear-gradient(90deg, #8b5cf6, #06b6d4);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-            margin-bottom: 4px;
-        }
-        #loading {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; font-size: 18px; z-index: 100;
-            background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px;
-        }
-        #error-panel {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #ff4444; font-size: 16px; z-index: 100;
-            background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px;
-            text-align: center; display: none;
-        }
         #controls {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 20; display: flex; gap: 10px; flex-wrap: wrap;
+            z-index: 100; display: flex; gap: 10px; flex-wrap: wrap;
             justify-content: center; padding: 10px;
             background: rgba(0,0,0,0.5); border-radius: 15px; backdrop-filter: blur(10px);
         }
@@ -47,24 +35,21 @@
             background: rgba(255,255,255,0.1); color: white;
             font-size: 18px; cursor: pointer; transition: all 0.2s;
         }
-        #controls button:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+        #controls button:hover { background: rgba(255,255,255,0.2); }
         #controls button:active { transform: scale(0.95); }
-        @media (max-width: 600px) {
-            #controls { gap: 8px; }
-            #controls button { width: 40px; height: 40px; font-size: 16px; }
-        }
     </style>
+    <!-- Charger Three.js et OrbitControls dans le head - ils bloquent et garantissent le chargement -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div id="loading">Chargement de Three.js...</div>
-    <div id="error-panel"></div>
+    <div id="loading">Keadex - Chargement...</div>
     <div id="canvas-container"></div>
-    <div id="info-panel">
-        <div id="shape-name">Keadex</div>
-        <div style="color: #aaa; font-size: 11px;">
+    <div id="info">
+        <div id="shape-name" style="font-weight:600;color:#8b5cf6">Keadex</div>
+        <div style="color:#aaa;font-size:11px">
             <span id="shape-index">0</span> | 
-            <span id="morph-progress-text">0%</span> | 
-            <span id="fps-counter">0 FPS</span>
+            <span id="fps">0 FPS</span>
         </div>
     </div>
     <div id="controls">
@@ -75,191 +60,107 @@
         <button id="btn-palette" title="Couleurs">🎨</button>
     </div>
 
-    <!-- Charger Three.js localement si CDN échoue -->
-    <script>
-        window.THREE_LOADED = false;
-        function loadThreeJS() {
-            return new Promise((resolve, reject) => {
-                if (window.THREE) {
-                    window.THREE_LOADED = true;
-                    return resolve();
-                }
-                
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
-                script.onload = () => {
-                    window.THREE_LOADED = true;
-                    resolve();
-                };
-                script.onerror = () => reject(new Error('Three.js CDN failed'));
-                document.head.appendChild(script);
-            });
-        }
-        
-        function loadOrbitControls() {
-            return new Promise((resolve, reject) => {
-                if (window.THREE && window.THREE.OrbitControls) {
-                    return resolve();
-                }
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
-                script.onload = () => resolve();
-                script.onerror = () => reject(new Error('OrbitControls CDN failed'));
-                document.head.appendChild(script);
-            });
-        }
-    </script>
-
     <script>
 // ============================================
-// KEADEX - Infinite Morphing Universe
-// Version simplifiée et robuste
+// KEADEX - Système de morphing 3D
+// Version ultra-robuste - tout le code ici s'exécute APRÈS Three.js
 // ============================================
 
 // Configuration
-const CONFIG = {
-    particleCount: 80000,
-    rotationSpeed: 0.15,
-    morphDuration: 6,
-    transitionDuration: 2.5,
-    quality: 'high'
+const CFG = {
+    particles: 60000,
+    rotationSpeed: 0.1,
+    morphDuration: 5000,    // ms
+    transitionDuration: 2000, // ms
+    fogDensity: 0.003
 };
 
-// Formes reconnaissables
-const SHAPES = [
-    'box', 'sphere', 'torus', 'cone', 'cylinder',
-    'tetrahedron', 'octahedron', 'icosahedron', 'dodecahedron',
-    'star', 'heart', 'spiral', 'helix', 'wave', 'fractal'
-];
+// Formes disponibles
+const SHAPES = ['box','sphere','torus','cone','cylinder','tetrahedron','octahedron','icosahedron','star','heart','spiral','helix'];
 
-// Palettes
+// Palettes de couleurs
 const PALETTES = [
-    [0x8b5cf6, 0x06b6d4, 0x3b82f6, 0xec4899],
-    [0xef4444, 0xf59e0b, 0x22c55e, 0x06b6d4],
-    [0x06b6d4, 0x22c55e, 0xa855f7, 0xec4899],
-    [0x3b82f6, 0x8b5cf6, 0xec4899, 0xf97316],
-    [0xffffff, 0xaaaaaa, 0x666666, 0x333333]
+    [0x8b5cf6,0x06b6d4,0x3b82f6,0xec4899],
+    [0xef4444,0xf59e0b,0x22c55e,0x06b6d4],
+    [0x06b6d4,0x22c55e,0xa855f7,0xec4899]
 ];
 
 // État
-let system = null;
-let currentShapeIndex = 0;
-let nextShapeIndex = 1;
+let scene, camera, renderer, controls, particles;
+let currentShape = 'box';
+let nextShape = 'sphere';
 let isMorphing = false;
-let morphProgress = 0;
+let morphStart = 0;
 let isPaused = false;
-let paletteIndex = 0;
+let paletteIdx = 0;
 let shapeCounter = 0;
-let particles = null;
-let scene, camera, renderer, controls;
+let currentGeometry, targetGeometry;
 
-// Attendre que Three.js soit chargé
-async function init() {
-    try {
-        document.getElementById('loading').textContent = 'Chargement des bibliothèques...';
-        
-        // Attendre Three.js
-        await loadThreeJS();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!window.THREE) {
-            throw new Error('Three.js non chargé');
-        }
-        
-        await loadOrbitControls();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        if (!window.THREE.OrbitControls) {
-            throw new Error('OrbitControls non chargé');
-        }
-        
-        document.getElementById('loading').textContent = 'Initialisation de la scène...';
-        
-        // Vérifier les performances
-        const isMobile = window.matchMedia('(max-width: 800px)').matches || 
-                        (navigator.maxTouchPoints || 0) > 0;
-        const isLowPower = (navigator.hardwareConcurrency || 8) <= 4 || 
-                          (navigator.deviceMemory || 8) <= 4;
-        
-        if (isMobile || isLowPower) {
-            CONFIG.particleCount = Math.floor(CONFIG.particleCount * 0.4);
-        }
-        
-        // Initialiser Three.js
-        initThreeJS();
-        initParticles();
-        initControls();
-        
-        // Masquer le chargement
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('info-panel').style.display = 'block';
-        document.getElementById('controls').style.display = 'flex';
-        
-        // Démarrer l'animation
-        animate();
-        
-    } catch (error) {
-        showError(error.message);
-    }
-}
-
-function showError(message) {
-    const errorPanel = document.getElementById('error-panel');
-    errorPanel.textContent = 'Erreur: ' + message + '\n\nVeuillez recharger la page.';
-    errorPanel.style.display = 'block';
-    document.getElementById('loading').style.display = 'none';
-    console.error('KEADEX Error:', message);
-}
-
-function initThreeJS() {
+// ===== INITIALISATION =====
+function init() {
     const container = document.getElementById('canvas-container');
     
+    // Scène
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, 0.003);
+    scene.fog = new THREE.FogExp2(0x000000, CFG.fogDensity);
     scene.background = new THREE.Color(0x000000);
     
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // Caméra
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
     camera.position.set(0, 0, 25);
-    camera.updateProjectionMatrix();
     
-    renderer = new THREE.WebGLRenderer({ 
-        antialias: true, 
-        powerPreference: "high-performance",
-        alpha: true
-    });
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
     
+    // Contrôles
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.maxDistance = 100;
+    controls.maxDistance = 80;
     controls.minDistance = 10;
-    controls.rotateSpeed = 0.8;
     
     // Lumière
-    const ambientLight = new THREE.AmbientLight(0x333366, 0.5);
-    scene.add(ambientLight);
+    const ambient = new THREE.AmbientLight(0x333366, 0.5);
+    scene.add(ambient);
+    const point = new THREE.PointLight(0xffffff, 0.8, 100);
+    point.position.set(20,20,20);
+    scene.add(point);
     
-    const pointLight = new THREE.PointLight(0xffffff, 0.8, 100);
-    pointLight.position.set(20, 20, 20);
-    scene.add(pointLight);
+    // Particules
+    createParticles();
     
-    // Gestion du redimensionnement
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    // Événements
+    window.addEventListener('resize', onResize);
+    document.getElementById('btn-prev').onclick = () => setNextShape(-1);
+    document.getElementById('btn-next').onclick = () => setNextShape(1);
+    document.getElementById('btn-random').onclick = () => setNextShape('random');
+    document.getElementById('btn-pause').onclick = () => togglePause();
+    document.getElementById('btn-palette').onclick = () => changePalette();
+    renderer.domElement.onclick = () => setNextShape('random');
+    
+    // Clavier
+    document.onkeydown = (e) => {
+        if(e.key===' ') setNextShape('random');
+        else if(e.key==='ArrowLeft') setNextShape(-1);
+        else if(e.key==='ArrowRight') setNextShape(1);
+        else if(e.key==='p'||e.key==='P') togglePause();
+        else if(e.key==='c'||e.key==='C') changePalette();
+    };
+    
+    // Masquer le chargement
+    document.getElementById('loading').style.display = 'none';
+    
+    // Démarrer
+    animate();
 }
 
-function initParticles() {
-    const geometry = createShapeGeometry(SHAPES[currentShapeIndex], CONFIG.particleCount);
-    
-    const material = new THREE.PointsMaterial({
+// ===== CRÉATION DES PARTICULES =====
+function createParticles() {
+    const geom = generateShapeGeometry(currentShape, CFG.particles);
+    const mat = new THREE.PointsMaterial({
         size: 0.04,
         vertexColors: true,
         transparent: true,
@@ -268,426 +169,222 @@ function initParticles() {
         blending: THREE.AdditiveBlending,
         depthWrite: false
     });
-    
-    particles = new THREE.Points(geometry, material);
+    particles = new THREE.Points(geom, mat);
     scene.add(particles);
-    
-    // Stocker les géométries
-    window.currentGeometry = geometry;
-    window.targetGeometry = null;
-    window.particleCount = CONFIG.particleCount;
-    
-    updateInfoPanel();
+    currentGeometry = geom;
 }
 
-function createShapeGeometry(shapeType, count) {
-    const geometry = new THREE.BufferGeometry();
+// ===== GÉOMÉTRIE PAR FORME =====
+function generateShapeGeometry(shapeType, count) {
+    const geom = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
     const colors = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
     
-    const palette = PALETTES[paletteIndex];
-    const colorCount = palette.length;
-    
-    // Générateur de bruit pseudo-aléatoire
-    function noise(x, y, z, seed) {
-        const n = x + y * 57 + z * 113 + seed * 131;
-        return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0 * 2 - 1;
-    }
-    
-    function getShapePoint(i, shapeType, seed) {
-        let x, y, z;
-        const scale = 1.0;
-        const complexity = 0.7;
-        
-        switch(shapeType) {
-            case 'box':
-                x = (Math.random() - 0.5) * 2 * scale;
-                y = (Math.random() - 0.5) * 2 * scale;
-                z = (Math.random() - 0.5) * 2 * scale;
-                const deform = noise(x, y, z, seed) * complexity * 0.4;
-                x += deform * (Math.random() - 0.5) * 0.3;
-                y += deform * (Math.random() - 0.5) * 0.3;
-                z += deform * (Math.random() - 0.5) * 0.3;
-                break;
-                
-            case 'sphere':
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.acos(2 * Math.random() - 1);
-                const r = Math.pow(Math.random(), 1/3);
-                x = r * Math.sin(phi) * Math.cos(theta) * scale;
-                y = r * Math.sin(phi) * Math.sin(theta) * scale;
-                z = r * Math.cos(phi) * scale;
-                const perturb = noise(x, y, z, seed) * complexity * 0.5;
-                const dir = Math.sqrt(x*x + y*y + z*z);
-                if (dir > 0) {
-                    x += x/dir * perturb * 0.3;
-                    y += y/dir * perturb * 0.3;
-                    z += z/dir * perturb * 0.3;
-                }
-                break;
-                
-            case 'torus':
-                const majorRadius = 1.0 * scale;
-                const minorRadius = 0.3 + complexity * 0.15;
-                const u = Math.random() * Math.PI * 2;
-                const v = Math.random() * Math.PI * 2;
-                x = (majorRadius + minorRadius * Math.cos(v)) * Math.cos(u) * scale;
-                y = (majorRadius + minorRadius * Math.cos(v)) * Math.sin(u) * scale;
-                z = minorRadius * Math.sin(v) * scale;
-                break;
-                
-            case 'cone':
-                const height = 2.0 * scale;
-                const radius = 1.0 * scale;
-                const t = Math.random();
-                const angle = Math.random() * Math.PI * 2;
-                x = radius * Math.sqrt(t) * Math.cos(angle) * scale;
-                y = height * (1 - t) * scale - height/2;
-                z = radius * Math.sqrt(t) * Math.sin(angle) * scale;
-                break;
-                
-            case 'cylinder':
-                const cylHeight = 2.0 * scale;
-                const cylRadius = 0.8 * scale;
-                const t2 = Math.random();
-                const angle2 = Math.random() * Math.PI * 2;
-                x = cylRadius * Math.cos(angle2) * scale;
-                y = cylHeight * (t2 - 0.5) * scale;
-                z = cylRadius * Math.sin(angle2) * scale;
-                break;
-                
-            case 'tetrahedron':
-                const tetraVertices = [[1,1,1], [-1,-1,1], [-1,1,-1], [1,-1,-1]];
-                const idx = Math.floor(Math.random() * 4);
-                x = tetraVertices[idx][0] * scale * (0.7 + Math.random() * 0.3);
-                y = tetraVertices[idx][1] * scale * (0.7 + Math.random() * 0.3);
-                z = tetraVertices[idx][2] * scale * (0.7 + Math.random() * 0.3);
-                break;
-                
-            case 'octahedron':
-                const octaVertices = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
-                const idx2 = Math.floor(Math.random() * 6);
-                x = octaVertices[idx2][0] * scale * (0.8 + Math.random() * 0.2);
-                y = octaVertices[idx2][1] * scale * (0.8 + Math.random() * 0.2);
-                z = octaVertices[idx2][2] * scale * (0.8 + Math.random() * 0.2);
-                break;
-                
-            case 'icosahedron':
-                const goldenRatio = (1 + Math.sqrt(5)) / 2;
-                const icoVertices = [
-                    [0,1,goldenRatio],[0,1,-goldenRatio],[0,-1,goldenRatio],[0,-1,-goldenRatio],
-                    [1,goldenRatio,0],[1,-goldenRatio,0],[-1,goldenRatio,0],[-1,-goldenRatio,0],
-                    [goldenRatio,0,1],[goldenRatio,0,-1],[-goldenRatio,0,1],[-goldenRatio,0,-1]
-                ];
-                const idx3 = Math.floor(Math.random() * 12);
-                const v = icoVertices[idx3];
-                const norm = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
-                x = (v[0]/norm) * scale * (0.9 + Math.random() * 0.1);
-                y = (v[1]/norm) * scale * (0.9 + Math.random() * 0.1);
-                z = (v[2]/norm) * scale * (0.9 + Math.random() * 0.1);
-                break;
-                
-            case 'dodecahedron':
-                // Simplified dodecahedron vertices
-                const phi = (1 + Math.sqrt(5)) / 2;
-                const dodecaVertices = [
-                    [1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1],
-                    [-1,1,1], [-1,1,-1], [-1,-1,1], [-1,-1,-1],
-                    [0,1/phi,phi], [0,1/phi,-phi], [0,-1/phi,phi], [0,-1/phi,-phi],
-                    [1/phi,phi,0], [1/phi,-phi,0], [-1/phi,phi,0], [-1/phi,-phi,0],
-                    [phi,0,1/phi], [phi,0,-1/phi], [-phi,0,1/phi], [-phi,0,-1/phi]
-                ];
-                const idx4 = Math.floor(Math.random() * 20);
-                const v4 = dodecaVertices[idx4];
-                const norm4 = Math.sqrt(v4[0]*v4[0]+v4[1]*v4[1]+v4[2]*v4[2]);
-                x = (v4[0]/norm4) * scale * (0.85 + Math.random() * 0.15);
-                y = (v4[1]/norm4) * scale * (0.85 + Math.random() * 0.15);
-                z = (v4[2]/norm4) * scale * (0.85 + Math.random() * 0.15);
-                break;
-                
-            case 'star':
-                const outerRadius = 1.0 * scale;
-                const innerRadius = 0.4 * scale;
-                const angle3 = Math.random() * Math.PI * 2;
-                const point = Math.floor(Math.random() * 10);
-                const radius3 = (point % 2 === 0) ? outerRadius : innerRadius;
-                x = radius3 * Math.cos(angle3) * scale;
-                y = radius3 * Math.sin(angle3) * scale;
-                z = (Math.random() - 0.5) * 0.2 * scale;
-                break;
-                
-            case 'heart':
-                const t3 = Math.random() * Math.PI * 2;
-                x = 16 * Math.pow(Math.sin(t3), 3) * scale * 0.08;
-                y = (13 * Math.cos(t3) - 5 * Math.cos(2*t3) - 2 * Math.cos(3*t3) - Math.cos(4*t3)) * scale * 0.08;
-                z = (Math.random() - 0.5) * 0.3 * scale;
-                break;
-                
-            case 'spiral':
-                const spiralT = Math.random() * Math.PI * 10;
-                const spiralR = spiralT * 0.1 * scale;
-                x = spiralR * Math.cos(spiralT) * scale;
-                y = spiralR * Math.sin(spiralT) * scale;
-                z = spiralT * 0.05 * scale;
-                break;
-                
-            case 'helix':
-                const helixT = Math.random() * Math.PI * 10;
-                x = Math.cos(helixT) * scale;
-                y = helixT * 0.1 * scale;
-                z = Math.sin(helixT) * scale;
-                break;
-                
-            case 'wave':
-                x = (Math.random() - 0.5) * 4 * scale;
-                y = Math.sin(x * 2) * 0.5 * scale;
-                z = (Math.random() - 0.5) * 0.5 * scale;
-                break;
-                
-            case 'fractal':
-                let fx = 0, fy = 0, fz = 0;
-                for (let iter = 0; iter < 5; iter++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    const dist = Math.pow(Math.random(), 2) * 2;
-                    fx += Math.cos(angle) * dist;
-                    fy += Math.sin(angle) * dist;
-                    fz += (Math.random() - 0.5) * dist * 0.3;
-                }
-                x = fx * scale * 0.15;
-                y = fy * scale * 0.15;
-                z = fz * scale * 0.15;
-                break;
-                
-            default:
-                x = (Math.random() - 0.5) * 2 * scale;
-                y = (Math.random() - 0.5) * 2 * scale;
-                z = (Math.random() - 0.5) * 2 * scale;
-        }
-        
-        return { x, y, z };
-    }
-    
-    // Générer les particules
+    const palette = PALETTES[paletteIdx];
     const seed = Date.now() + shapeCounter;
-    for (let i = 0; i < count; i++) {
-        const pos = getShapePoint(i, shapeType, seed + i);
-        positions[i * 3] = pos.x;
-        positions[i * 3 + 1] = pos.y;
-        positions[i * 3 + 2] = pos.z;
+    
+    for(let i=0; i<count; i++) {
+        const p = getPointForShape(shapeType, i, seed+i);
+        positions[i*3] = p.x;
+        positions[i*3+1] = p.y;
+        positions[i*3+2] = p.z;
         
-        const colorIndex = Math.floor(Math.random() * colorCount);
-        const color = new THREE.Color(palette[colorIndex]);
-        colors[i * 3] = color.r;
-        colors[i * 3 + 1] = color.g;
-        colors[i * 3 + 2] = color.b;
+        const c = new THREE.Color(palette[i % palette.length]);
+        colors[i*3] = c.r;
+        colors[i*3+1] = c.g;
+        colors[i*3+2] = c.b;
         
-        sizes[i] = 0.02 + Math.random() * 0.06;
+        sizes[i] = 0.02 + Math.random()*0.06;
     }
     
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-    
-    return geometry;
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geom.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    return geom;
 }
 
-function lerpGeometries(geom1, geom2, progress, targetCount) {
-    const positions1 = geom1.attributes.position.array;
-    const positions2 = geom2.attributes.position.array;
-    const colors1 = geom1.attributes.color.array;
-    const colors2 = geom2.attributes.color.array;
-    const sizes1 = geom1.attributes.size.array;
-    const sizes2 = geom2.attributes.size.array;
+function getPointForShape(type, i, seed) {
+    const r = () => Math.random();
+    const s = 1.0;
     
-    const count = Math.min(positions1.length / 3, positions2.length / 3, targetCount);
-    const newPositions = new Float32Array(count * 3);
-    const newColors = new Float32Array(count * 3);
-    const newSizes = new Float32Array(count);
+    switch(type) {
+        case 'box': return {x:(r()-0.5)*2*s, y:(r()-0.5)*2*s, z:(r()-0.5)*2*s};
+        case 'sphere': 
+            const theta = r()*Math.PI*2, phi = Math.acos(2*r()-1), rr = Math.pow(r(),1/3);
+            return {x:rr*Math.sin(phi)*Math.cos(theta)*s, y:rr*Math.sin(phi)*Math.sin(theta)*s, z:rr*Math.cos(phi)*s};
+        case 'torus':
+            const u=r()*Math.PI*2, v=r()*Math.PI*2;
+            return {x:(1+0.3*Math.cos(v))*Math.cos(u)*s, y:(1+0.3*Math.cos(v))*Math.sin(u)*s, z:0.3*Math.sin(v)*s};
+        case 'cone':
+            const t=r(), a=r()*Math.PI*2;
+            return {x:Math.sqrt(t)*Math.cos(a)*s, y:(1-t)*2*s-1, z:Math.sqrt(t)*Math.sin(a)*s};
+        case 'cylinder':
+            const t2=r(), a2=r()*Math.PI*2;
+            return {x:Math.cos(a2)*s, y:(t2-0.5)*2*s, z:Math.sin(a2)*s};
+        case 'tetrahedron':
+            const vx=[[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]];
+            const vi=Math.floor(r()*4);
+            return {x:vx[vi][0]*(0.7+r()*0.3)*s, y:vx[vi][1]*(0.7+r()*0.3)*s, z:vx[vi][2]*(0.7+r()*0.3)*s};
+        case 'octahedron':
+            const vo=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+            const vi2=Math.floor(r()*6);
+            return {x:vo[vi2][0]*(0.8+r()*0.2)*s, y:vo[vi2][1]*(0.8+r()*0.2)*s, z:vo[vi2][2]*(0.8+r()*0.2)*s};
+        case 'icosahedron':
+            const gr=(1+Math.sqrt(5))/2;
+            const vi3=[[0,1,gr],[0,1,-gr],[0,-1,gr],[0,-1,-gr],[1,gr,0],[1,-gr,0],[-1,gr,0],[-1,-gr,0],[gr,0,1],[gr,0,-1],[-gr,0,1],[-gr,0,-1]];
+            const vii=Math.floor(r()*12);
+            const v=vi3[vii];
+            const n=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+            return {x:(v[0]/n)*(0.9+r()*0.1)*s, y:(v[1]/n)*(0.9+r()*0.1)*s, z:(v[2]/n)*(0.9+r()*0.1)*s};
+        case 'star':
+            const a3=r()*Math.PI*2, pt=Math.floor(r()*10);
+            const rad=(pt%2===0)?1:0.4;
+            return {x:rad*Math.cos(a3)*s, y:rad*Math.sin(a3)*s, z:(r()-0.5)*0.2*s};
+        case 'heart':
+            const t3=r()*Math.PI*2;
+            return {x:16*Math.pow(Math.sin(t3),3)*0.08*s, y:(13*Math.cos(t3)-5*Math.cos(2*t3)-2*Math.cos(3*t3)-Math.cos(4*t3))*0.08*s, z:(r()-0.5)*0.3*s};
+        case 'spiral':
+            const st=r()*Math.PI*10, sr=st*0.1;
+            return {x:sr*Math.cos(st)*s, y:sr*Math.sin(st)*s, z:st*0.05*s};
+        case 'helix':
+            const ht=r()*Math.PI*10;
+            return {x:Math.cos(ht)*s, y:ht*0.1*s, z:Math.sin(ht)*s};
+        default: return {x:(r()-0.5)*2*s, y:(r()-0.5)*2*s, z:(r()-0.5)*2*s};
+    }
+}
+
+// ===== MORPHING =====
+function lerpGeometries(g1, g2, progress, count) {
+    const p1 = g1.attributes.position.array;
+    const p2 = g2.attributes.position.array;
+    const c1 = g1.attributes.color.array;
+    const c2 = g2.attributes.color.array;
+    const s1 = g1.attributes.size.array;
+    const s2 = g2.attributes.size.array;
     
-    for (let i = 0; i < count; i++) {
-        const idx = i * 3;
-        const p1x = positions1[idx];
-        const p1y = positions1[idx + 1];
-        const p1z = positions1[idx + 2];
-        const p2x = positions2[idx % positions2.length];
-        const p2y = positions2[(idx + 1) % positions2.length];
-        const p2z = positions2[(idx + 2) % positions2.length];
-        
-        newPositions[idx] = p1x + (p2x - p1x) * progress;
-        newPositions[idx + 1] = p1y + (p2y - p1y) * progress;
-        newPositions[idx + 2] = p1z + (p2z - p1z) * progress;
-        
-        newColors[idx] = colors1[idx] + (colors2[idx % colors2.length] - colors1[idx]) * progress;
-        newColors[idx + 1] = colors1[idx + 1] + (colors2[(idx + 1) % colors2.length] - colors1[idx + 1]) * progress;
-        newColors[idx + 2] = colors1[idx + 2] + (colors2[(idx + 2) % colors2.length] - colors1[idx + 2]) * progress;
-        
-        newSizes[i] = sizes1[i % sizes1.length] + (sizes2[i % sizes2.length] - sizes1[i % sizes1.length]) * progress;
+    const n = Math.min(p1.length/3, p2.length/3, count);
+    const np = new Float32Array(n*3);
+    const nc = new Float32Array(n*3);
+    const ns = new Float32Array(n);
+    
+    for(let i=0; i<n; i++) {
+        const idx = i*3;
+        np[idx] = p1[idx] + (p2[idx%p2.length] - p1[idx]) * progress;
+        np[idx+1] = p1[idx+1] + (p2[(idx+1)%p2.length] - p1[idx+1]) * progress;
+        np[idx+2] = p1[idx+2] + (p2[(idx+2)%p2.length] - p1[idx+2]) * progress;
+        nc[idx] = c1[idx] + (c2[idx%c2.length] - c1[idx]) * progress;
+        nc[idx+1] = c1[idx+1] + (c2[(idx+1)%c2.length] - c1[idx+1]) * progress;
+        nc[idx+2] = c1[idx+2] + (c2[(idx+2)%c2.length] - c1[idx+2]) * progress;
+        ns[i] = s1[i%s1.length] + (s2[i%s2.length] - s1[i%s1.length]) * progress;
     }
     
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(newSizes, 1));
-    
-    return geometry;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(np, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(nc, 3));
+    g.setAttribute('size', new THREE.BufferAttribute(ns, 1));
+    return g;
 }
 
 function startMorph() {
     isMorphing = true;
-    morphProgress = 0;
-    morphStartTime = Date.now();
-    
-    window.targetGeometry = createShapeGeometry(SHAPES[nextShapeIndex], window.particleCount);
+    morphStart = Date.now();
+    targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
 }
 
-function nextRandomShape() {
-    let newIndex;
-    do {
-        newIndex = Math.floor(Math.random() * SHAPES.length);
-    } while (newIndex === currentShapeIndex && SHAPES.length > 1);
-    return newIndex;
+function setNextShape(dir) {
+    if(dir === 'random') {
+        do { nextShape = SHAPES[Math.floor(Math.random()*SHAPES.length)]; }
+        while(nextShape === currentShape && SHAPES.length > 1);
+    } else {
+        const idx = SHAPES.indexOf(currentShape);
+        nextShape = SHAPES[(idx + dir + SHAPES.length) % SHAPES.length];
+    }
+    startMorph();
 }
 
-function updateInfoPanel() {
-    document.getElementById('shape-name').textContent = SHAPES[currentShapeIndex].charAt(0).toUpperCase() + 
-        SHAPES[currentShapeIndex].slice(1);
-    document.getElementById('shape-index').textContent = shapeCounter;
+function togglePause() {
+    isPaused = !isPaused;
+    document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
 }
 
-function initControls() {
-    document.getElementById('btn-prev').addEventListener('click', () => {
-        nextShapeIndex = (currentShapeIndex - 1 + SHAPES.length) % SHAPES.length;
-        startMorph();
-    });
-    
-    document.getElementById('btn-next').addEventListener('click', () => {
-        nextShapeIndex = (currentShapeIndex + 1) % SHAPES.length;
-        startMorph();
-    });
-    
-    document.getElementById('btn-pause').addEventListener('click', () => {
-        isPaused = !isPaused;
-        document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
-    });
-    
-    document.getElementById('btn-random').addEventListener('click', () => {
-        nextShapeIndex = nextRandomShape();
-        startMorph();
-    });
-    
-    document.getElementById('btn-palette').addEventListener('click', () => {
-        paletteIndex = (paletteIndex + 1) % PALETTES.length;
-        // Recréer les particules avec la nouvelle palette
-        particles.geometry.dispose();
-        particles.geometry = createShapeGeometry(SHAPES[currentShapeIndex], window.particleCount);
-        window.currentGeometry = particles.geometry;
-        if (isMorphing) {
-            window.targetGeometry = createShapeGeometry(SHAPES[nextShapeIndex], window.particleCount);
-        }
-    });
-    
-    // Clavier
-    document.addEventListener('keydown', (e) => {
-        if (e.key === ' ' || e.key === 'Spacebar') {
-            nextShapeIndex = nextRandomShape();
-            startMorph();
-        } else if (e.key === 'ArrowLeft') {
-            nextShapeIndex = (currentShapeIndex - 1 + SHAPES.length) % SHAPES.length;
-            startMorph();
-        } else if (e.key === 'ArrowRight') {
-            nextShapeIndex = (currentShapeIndex + 1) % SHAPES.length;
-            startMorph();
-        } else if (e.key === 'p' || e.key === 'P') {
-            isPaused = !isPaused;
-            document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
-        } else if (e.key === 'c' || e.key === 'C') {
-            paletteIndex = (paletteIndex + 1) % PALETTES.length;
-            particles.geometry.dispose();
-            particles.geometry = createShapeGeometry(SHAPES[currentShapeIndex], window.particleCount);
-            window.currentGeometry = particles.geometry;
-            if (isMorphing) {
-                window.targetGeometry = createShapeGeometry(SHAPES[nextShapeIndex], window.particleCount);
-            }
-        }
-    });
-    
-    // Clic sur le canvas
-    renderer.domElement.addEventListener('click', () => {
-        nextShapeIndex = nextRandomShape();
-        startMorph();
-    });
+function changePalette() {
+    paletteIdx = (paletteIdx + 1) % PALETTES.length;
+    particles.geometry.dispose();
+    particles.geometry = generateShapeGeometry(currentShape, CFG.particles);
+    currentGeometry = particles.geometry;
+    if(isMorphing) targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
 }
 
-let morphStartTime = 0;
+function onResize() {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ===== ANIMATION =====
+let lastTime = Date.now();
 let frameCount = 0;
-let lastFpsTime = 0;
+let fpsTime = lastTime;
 
 function animate() {
     requestAnimationFrame(animate);
     
-    if (!isPaused) {
-        const now = Date.now();
-        const delta = (now - (window.lastTime || now)) / 1000;
-        window.lastTime = now;
-        
+    const now = Date.now();
+    const delta = (now - lastTime) / 1000;
+    lastTime = now;
+    
+    if(!isPaused) {
         // Rotation
-        if (particles) {
-            particles.rotation.y += CONFIG.rotationSpeed * delta;
-        }
+        particles.rotation.y += CFG.rotationSpeed * delta;
         
         // Morphing automatique
-        if (!isMorphing) {
-            const elapsed = (now - morphStartTime) / 1000;
-            if (elapsed > CONFIG.morphDuration) {
-                nextShapeIndex = nextRandomShape();
-                startMorph();
-            }
+        if(!isMorphing && (now - morphStart) > CFG.morphDuration) {
+            setNextShape('random');
         }
         
-        // Animation de morphing
-        if (isMorphing) {
-            const elapsed = (now - morphStartTime) / 1000;
-            morphProgress = Math.min(1.0, elapsed / CONFIG.transitionDuration);
+        // Animation morphing
+        if(isMorphing) {
+            const elapsed = now - morphStart;
+            const progress = Math.min(1, elapsed / CFG.transitionDuration);
             
-            const morphedGeometry = lerpGeometries(
-                window.currentGeometry,
-                window.targetGeometry,
-                morphProgress,
-                window.particleCount
-            );
-            
+            const g = lerpGeometries(currentGeometry, targetGeometry, progress, CFG.particles);
             particles.geometry.dispose();
-            particles.geometry = morphedGeometry;
+            particles.geometry = g;
             
-            document.getElementById('morph-progress-text').textContent = Math.round(morphProgress * 100) + '%';
-            
-            if (morphProgress >= 1.0) {
+            if(progress >= 1) {
                 isMorphing = false;
-                currentShapeIndex = nextShapeIndex;
-                window.currentGeometry = window.targetGeometry;
+                currentShape = nextShape;
+                currentGeometry = targetGeometry;
                 shapeCounter++;
-                updateInfoPanel();
-                morphStartTime = now;
+                document.getElementById('shape-name').textContent = currentShape;
+                document.getElementById('shape-index').textContent = shapeCounter;
+                morphStart = now;
             }
         }
         
         controls.update();
     }
     
-    // FPS counter
+    // FPS
     frameCount++;
-    if (now - lastFpsTime >= 1000) {
-        document.getElementById('fps-counter').textContent = frameCount + ' FPS';
+    if(now - fpsTime >= 1000) {
+        document.getElementById('fps').textContent = frameCount + ' FPS';
         frameCount = 0;
-        lastFpsTime = now;
+        fpsTime = now;
     }
     
     renderer.render(scene, camera);
 }
 
-// Démarrer l'initialisation
-init();
+// ===== DÉMARRAGE =====
+// Vérifier que THREE est chargé
+if(typeof THREE !== 'undefined' && THREE.OrbitControls) {
+    init();
+} else {
+    // Si pas chargé, afficher erreur
+    document.getElementById('loading').textContent = 'Erreur: Three.js non chargé. Vérifiez votre connexion.';
+}
     </script>
 </body>
 </html>
