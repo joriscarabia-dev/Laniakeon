@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Keadex - Infinite Morphing Universe</title>
+    <title>Keadex - Morphing 3D</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body {
@@ -13,22 +13,25 @@
             touch-action: none; font-family: system-ui, sans-serif;
         }
         #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-        #loading {
+        #debug {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #fff; font-size: 18px; z-index: 1000;
-            background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px;
+            color: #fff; font-size: 16px; z-index: 1000;
+            background: rgba(0,0,0,0.95); padding: 20px; border-radius: 10px;
+            text-align: center; max-width: 80%;
         }
         #info {
             position: fixed; top: 16px; left: 16px; z-index: 100;
             color: #fff; background: rgba(0,0,0,0.7);
             border-radius: 12px; padding: 12px 16px;
             font: 12px system-ui, sans-serif; backdrop-filter: blur(10px);
+            display: none;
         }
         #controls {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
             z-index: 100; display: flex; gap: 10px; flex-wrap: wrap;
             justify-content: center; padding: 10px;
             background: rgba(0,0,0,0.5); border-radius: 15px; backdrop-filter: blur(10px);
+            display: none;
         }
         #controls button {
             width: 44px; height: 44px; border: none; border-radius: 12px;
@@ -37,21 +40,25 @@
         }
         #controls button:hover { background: rgba(255,255,255,0.2); }
         #controls button:active { transform: scale(0.95); }
+        .hidden { display: none !important; }
     </style>
-    <!-- Charger Three.js et OrbitControls dans le head - ils bloquent et garantissent le chargement -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-    <div id="loading">Keadex - Chargement...</div>
+    <div id="debug">
+        <div>Keadex - Initialisation en cours...</div>
+        <div id="debug-step">Étape 1: Chargement de Three.js...</div>
+        <div id="debug-error" style="color:#ff4444;margin-top:10px;"></div>
+    </div>
+    
     <div id="canvas-container"></div>
+    
     <div id="info">
         <div id="shape-name" style="font-weight:600;color:#8b5cf6">Keadex</div>
         <div style="color:#aaa;font-size:11px">
-            <span id="shape-index">0</span> | 
-            <span id="fps">0 FPS</span>
+            <span id="shape-index">0</span> | <span id="fps">0 FPS</span>
         </div>
     </div>
+    
     <div id="controls">
         <button id="btn-prev" title="Précédent">←</button>
         <button id="btn-pause" title="Pause">⏸</button>
@@ -60,25 +67,51 @@
         <button id="btn-palette" title="Couleurs">🎨</button>
     </div>
 
+    <!-- Charger Three.js EN PREMIER - ces scripts bloquent l'exécution -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Vérifier que Three.js est chargé -->
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.getElementById('debug-step').textContent = 'ERREUR: Three.js non chargé depuis CDN';
+            document.getElementById('debug-error').textContent = 'Vérifiez votre connexion internet ou désactivez les bloquers de scripts.';
+            throw new Error('Three.js not loaded');
+        }
+        document.getElementById('debug-step').textContent = 'Étape 2: Chargement de OrbitControls...';
+    </script>
+    
+    <!-- Charger OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Vérifier OrbitControls -->
+    <script>
+        if (typeof THREE.OrbitControls === 'undefined') {
+            document.getElementById('debug-step').textContent = 'ERREUR: OrbitControls non chargé';
+            document.getElementById('debug-error').textContent = 'Problème avec le CDN jsdelivr.net';
+            throw new Error('OrbitControls not loaded');
+        }
+        document.getElementById('debug-step').textContent = 'Étape 3: Initialisation de la scène...';
+    </script>
+
+    <!-- MAIN CODE - S'exécute UNIQUEMENT si Three.js et OrbitControls sont chargés -->
     <script>
 // ============================================
-// KEADEX - Système de morphing 3D
-// Version ultra-robuste - tout le code ici s'exécute APRÈS Three.js
+// KEADEX - Version garantie
 // ============================================
 
 // Configuration
 const CFG = {
-    particles: 60000,
+    particles: 40000,
     rotationSpeed: 0.1,
-    morphDuration: 5000,    // ms
-    transitionDuration: 2000, // ms
+    morphDuration: 5000,
+    transitionDuration: 2000,
     fogDensity: 0.003
 };
 
-// Formes disponibles
+// Formes
 const SHAPES = ['box','sphere','torus','cone','cylinder','tetrahedron','octahedron','icosahedron','star','heart','spiral','helix'];
 
-// Palettes de couleurs
+// Palettes
 const PALETTES = [
     [0x8b5cf6,0x06b6d4,0x3b82f6,0xec4899],
     [0xef4444,0xf59e0b,0x22c55e,0x06b6d4],
@@ -87,8 +120,8 @@ const PALETTES = [
 
 // État
 let scene, camera, renderer, controls, particles;
-let currentShape = 'box';
-let nextShape = 'sphere';
+let currentShape = 'sphere';
+let nextShape = 'box';
 let isMorphing = false;
 let morphStart = 0;
 let isPaused = false;
@@ -96,68 +129,59 @@ let paletteIdx = 0;
 let shapeCounter = 0;
 let currentGeometry, targetGeometry;
 
-// ===== INITIALISATION =====
+// ===== INIT =====
 function init() {
-    const container = document.getElementById('canvas-container');
-    
-    // Scène
-    scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, CFG.fogDensity);
-    scene.background = new THREE.Color(0x000000);
-    
-    // Caméra
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 25);
-    
-    // Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-    
-    // Contrôles
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.maxDistance = 80;
-    controls.minDistance = 10;
-    
-    // Lumière
-    const ambient = new THREE.AmbientLight(0x333366, 0.5);
-    scene.add(ambient);
-    const point = new THREE.PointLight(0xffffff, 0.8, 100);
-    point.position.set(20,20,20);
-    scene.add(point);
-    
-    // Particules
-    createParticles();
-    
-    // Événements
-    window.addEventListener('resize', onResize);
-    document.getElementById('btn-prev').onclick = () => setNextShape(-1);
-    document.getElementById('btn-next').onclick = () => setNextShape(1);
-    document.getElementById('btn-random').onclick = () => setNextShape('random');
-    document.getElementById('btn-pause').onclick = () => togglePause();
-    document.getElementById('btn-palette').onclick = () => changePalette();
-    renderer.domElement.onclick = () => setNextShape('random');
-    
-    // Clavier
-    document.onkeydown = (e) => {
-        if(e.key===' ') setNextShape('random');
-        else if(e.key==='ArrowLeft') setNextShape(-1);
-        else if(e.key==='ArrowRight') setNextShape(1);
-        else if(e.key==='p'||e.key==='P') togglePause();
-        else if(e.key==='c'||e.key==='C') changePalette();
-    };
-    
-    // Masquer le chargement
-    document.getElementById('loading').style.display = 'none';
-    
-    // Démarrer
-    animate();
+    try {
+        const container = document.getElementById('canvas-container');
+        
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, CFG.fogDensity);
+        scene.background = new THREE.Color(0x000000);
+        
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 25);
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+        
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 80;
+        controls.minDistance = 10;
+        
+        const ambient = new THREE.AmbientLight(0x333366, 0.5);
+        scene.add(ambient);
+        const point = new THREE.PointLight(0xffffff, 0.8, 100);
+        point.position.set(20,20,20);
+        scene.add(point);
+        
+        createParticles();
+        setupControls();
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Masquer debug, afficher UI
+        document.getElementById('debug').classList.add('hidden');
+        document.getElementById('info').style.display = 'block';
+        document.getElementById('controls').style.display = 'flex';
+        
+        animate();
+        
+    } catch (error) {
+        document.getElementById('debug-step').textContent = 'ERREUR: ' + error.message;
+        document.getElementById('debug-error').textContent = 'Stack: ' + error.stack;
+        document.getElementById('debug').style.background = 'rgba(255,0,0,0.95)';
+    }
 }
 
-// ===== CRÉATION DES PARTICULES =====
+// ===== PARTICLES =====
 function createParticles() {
     const geom = generateShapeGeometry(currentShape, CFG.particles);
     const mat = new THREE.PointsMaterial({
@@ -174,7 +198,7 @@ function createParticles() {
     currentGeometry = geom;
 }
 
-// ===== GÉOMÉTRIE PAR FORME =====
+// ===== SHAPE GENERATION =====
 function generateShapeGeometry(shapeType, count) {
     const geom = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
@@ -183,19 +207,15 @@ function generateShapeGeometry(shapeType, count) {
     
     const palette = PALETTES[paletteIdx];
     const seed = Date.now() + shapeCounter;
+    const r = () => Math.random();
     
-    for(let i=0; i<count; i++) {
-        const p = getPointForShape(shapeType, i, seed+i);
-        positions[i*3] = p.x;
-        positions[i*3+1] = p.y;
-        positions[i*3+2] = p.z;
+    for(let i = 0; i < count; i++) {
+        const p = getPoint(shapeType, r(), seed + i);
+        positions[i*3] = p.x; positions[i*3+1] = p.y; positions[i*3+2] = p.z;
         
         const c = new THREE.Color(palette[i % palette.length]);
-        colors[i*3] = c.r;
-        colors[i*3+1] = c.g;
-        colors[i*3+2] = c.b;
-        
-        sizes[i] = 0.02 + Math.random()*0.06;
+        colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+        sizes[i] = 0.02 + r() * 0.06;
     }
     
     geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -204,24 +224,24 @@ function generateShapeGeometry(shapeType, count) {
     return geom;
 }
 
-function getPointForShape(type, i, seed) {
-    const r = () => Math.random();
+function getPoint(type, rand, seed) {
+    const r = () => rand;
     const s = 1.0;
     
     switch(type) {
         case 'box': return {x:(r()-0.5)*2*s, y:(r()-0.5)*2*s, z:(r()-0.5)*2*s};
         case 'sphere': 
-            const theta = r()*Math.PI*2, phi = Math.acos(2*r()-1), rr = Math.pow(r(),1/3);
-            return {x:rr*Math.sin(phi)*Math.cos(theta)*s, y:rr*Math.sin(phi)*Math.sin(theta)*s, z:rr*Math.cos(phi)*s};
+            const t = r()*Math.PI*2, p = Math.acos(2*r()-1), d = Math.pow(r(),1/3);
+            return {x:d*Math.sin(p)*Math.cos(t)*s, y:d*Math.sin(p)*Math.sin(t)*s, z:d*Math.cos(p)*s};
         case 'torus':
             const u=r()*Math.PI*2, v=r()*Math.PI*2;
             return {x:(1+0.3*Math.cos(v))*Math.cos(u)*s, y:(1+0.3*Math.cos(v))*Math.sin(u)*s, z:0.3*Math.sin(v)*s};
         case 'cone':
-            const t=r(), a=r()*Math.PI*2;
-            return {x:Math.sqrt(t)*Math.cos(a)*s, y:(1-t)*2*s-1, z:Math.sqrt(t)*Math.sin(a)*s};
+            const t2=r(), a=r()*Math.PI*2;
+            return {x:Math.sqrt(t2)*Math.cos(a)*s, y:(1-t2)*2*s-1, z:Math.sqrt(t2)*Math.sin(a)*s};
         case 'cylinder':
-            const t2=r(), a2=r()*Math.PI*2;
-            return {x:Math.cos(a2)*s, y:(t2-0.5)*2*s, z:Math.sin(a2)*s};
+            const t3=r(), a2=r()*Math.PI*2;
+            return {x:Math.cos(a2)*s, y:(t3-0.5)*2*s, z:Math.sin(a2)*s};
         case 'tetrahedron':
             const vx=[[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]];
             const vi=Math.floor(r()*4);
@@ -242,8 +262,8 @@ function getPointForShape(type, i, seed) {
             const rad=(pt%2===0)?1:0.4;
             return {x:rad*Math.cos(a3)*s, y:rad*Math.sin(a3)*s, z:(r()-0.5)*0.2*s};
         case 'heart':
-            const t3=r()*Math.PI*2;
-            return {x:16*Math.pow(Math.sin(t3),3)*0.08*s, y:(13*Math.cos(t3)-5*Math.cos(2*t3)-2*Math.cos(3*t3)-Math.cos(4*t3))*0.08*s, z:(r()-0.5)*0.3*s};
+            const t4=r()*Math.PI*2;
+            return {x:16*Math.pow(Math.sin(t4),3)*0.08*s, y:(13*Math.cos(t4)-5*Math.cos(2*t4)-2*Math.cos(3*t4)-Math.cos(4*t4))*0.08*s, z:(r()-0.5)*0.3*s};
         case 'spiral':
             const st=r()*Math.PI*10, sr=st*0.1;
             return {x:sr*Math.cos(st)*s, y:sr*Math.sin(st)*s, z:st*0.05*s};
@@ -262,7 +282,6 @@ function lerpGeometries(g1, g2, progress, count) {
     const c2 = g2.attributes.color.array;
     const s1 = g1.attributes.size.array;
     const s2 = g2.attributes.size.array;
-    
     const n = Math.min(p1.length/3, p2.length/3, count);
     const np = new Float32Array(n*3);
     const nc = new Float32Array(n*3);
@@ -303,23 +322,41 @@ function setNextShape(dir) {
     startMorph();
 }
 
-function togglePause() {
-    isPaused = !isPaused;
-    document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
-}
-
-function changePalette() {
-    paletteIdx = (paletteIdx + 1) % PALETTES.length;
-    particles.geometry.dispose();
-    particles.geometry = generateShapeGeometry(currentShape, CFG.particles);
-    currentGeometry = particles.geometry;
-    if(isMorphing) targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
-}
-
-function onResize() {
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+// ===== CONTROLS =====
+function setupControls() {
+    document.getElementById('btn-prev').onclick = () => setNextShape(-1);
+    document.getElementById('btn-next').onclick = () => setNextShape(1);
+    document.getElementById('btn-random').onclick = () => setNextShape('random');
+    document.getElementById('btn-pause').onclick = () => {
+        isPaused = !isPaused;
+        document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
+    };
+    document.getElementById('btn-palette').onclick = () => {
+        paletteIdx = (paletteIdx + 1) % PALETTES.length;
+        particles.geometry.dispose();
+        particles.geometry = generateShapeGeometry(currentShape, CFG.particles);
+        currentGeometry = particles.geometry;
+        if(isMorphing) targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
+    };
+    
+    renderer.domElement.onclick = () => setNextShape('random');
+    
+    document.onkeydown = (e) => {
+        if(e.key===' ') setNextShape('random');
+        else if(e.key==='ArrowLeft') setNextShape(-1);
+        else if(e.key==='ArrowRight') setNextShape(1);
+        else if(e.key==='p'||e.key==='P') {
+            isPaused = !isPaused;
+            document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
+        }
+        else if(e.key==='c'||e.key==='C') {
+            paletteIdx = (paletteIdx + 1) % PALETTES.length;
+            particles.geometry.dispose();
+            particles.geometry = generateShapeGeometry(currentShape, CFG.particles);
+            currentGeometry = particles.geometry;
+            if(isMorphing) targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
+        }
+    };
 }
 
 // ===== ANIMATION =====
@@ -329,25 +366,20 @@ let fpsTime = lastTime;
 
 function animate() {
     requestAnimationFrame(animate);
-    
     const now = Date.now();
     const delta = (now - lastTime) / 1000;
     lastTime = now;
     
     if(!isPaused) {
-        // Rotation
         particles.rotation.y += CFG.rotationSpeed * delta;
         
-        // Morphing automatique
         if(!isMorphing && (now - morphStart) > CFG.morphDuration) {
             setNextShape('random');
         }
         
-        // Animation morphing
         if(isMorphing) {
             const elapsed = now - morphStart;
             const progress = Math.min(1, elapsed / CFG.transitionDuration);
-            
             const g = lerpGeometries(currentGeometry, targetGeometry, progress, CFG.particles);
             particles.geometry.dispose();
             particles.geometry = g;
@@ -362,11 +394,9 @@ function animate() {
                 morphStart = now;
             }
         }
-        
         controls.update();
     }
     
-    // FPS
     frameCount++;
     if(now - fpsTime >= 1000) {
         document.getElementById('fps').textContent = frameCount + ' FPS';
@@ -377,13 +407,14 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// ===== DÉMARRAGE =====
-// Vérifier que THREE est chargé
-if(typeof THREE !== 'undefined' && THREE.OrbitControls) {
+// ===== START =====
+// Vérifier une dernière fois que tout est prêt
+if (typeof THREE !== 'undefined' && typeof THREE.OrbitControls !== 'undefined') {
+    document.getElementById('debug-step').textContent = 'Étape 4: Démarrage...';
     init();
 } else {
-    // Si pas chargé, afficher erreur
-    document.getElementById('loading').textContent = 'Erreur: Three.js non chargé. Vérifiez votre connexion.';
+    document.getElementById('debug-step').textContent = 'ERREUR CRITIQUE: Three.js ou OrbitControls non disponibles';
+    document.getElementById('debug-error').textContent = 'Le code ne peut pas s\'exécuter.';
 }
     </script>
 </body>
