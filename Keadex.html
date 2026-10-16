@@ -4,709 +4,690 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Keadex - Infinite Morphing Universe</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body {
-            width: 100%;
-            height: 100%;
-            height: 100dvh;
-            overflow: hidden;
-            background: linear-gradient(135deg, #000000 0%, #0a0a1a 50%, #000022 100%);
-            user-select: none;
-            -webkit-user-select: none;
-            touch-action: none;
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            width: 100%; height: 100%; height: 100dvh;
+            overflow: hidden; background: #000;
+            user-select: none; -webkit-user-select: none;
+            touch-action: none; font-family: system-ui, sans-serif;
         }
-        #canvas-container {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-        }
-        .absolute { display: none !important; }
-        #brightness-panel {
-            display: none; position: fixed; z-index: 20; left: 50%; bottom: 22px; transform: translateX(-50%);
-            width: min(340px, calc(100vw - 32px)); padding: 14px 16px; color: #f3f4f6;
-            background: rgba(10, 14, 26, 0.88); border: 1px solid rgba(255,255,255,.16);
-            border-radius: 14px; font: 13px system-ui, sans-serif; backdrop-filter: blur(12px);
-        }
-        #brightness-panel.visible { display: block; }
-        #self-model-panel {
-            display: none; position: fixed; z-index: 21; top: 16px; right: 16px;
-            width: min(320px, calc(100vw - 32px)); padding: 15px 17px; color: #e9f5ff;
-            background: rgba(5, 11, 24, .88); border: 1px solid rgba(120, 190, 255, .24);
-            border-radius: 16px; font: 13px/1.45 system-ui, sans-serif; backdrop-filter: blur(14px);
-            box-shadow: 0 12px 40px rgba(0,0,0,.35);
-        }
-        #self-model-panel.visible { display: block; }
-        #self-model-panel h2 { color: #91caff; font-size: 13px; margin-bottom: 5px; }
-        #self-model-panel p { color: #aab9ca; font-size: 11px; margin-bottom: 10px; }
-        #self-model-panel .model-row { display: flex; justify-content: space-between; gap: 14px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,.07); }
-        #self-model-panel strong { color: #f4fbff; font-variant-numeric: tabular-nums; }
-        #mobile-controls { display: none; }
-        #mobile-controls button {
-            width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.18); border-radius: 15px;
-            color: #eafaff; background: rgba(12, 24, 44, .82); font: 20px system-ui, sans-serif;
-            touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-        }
-        #mobile-controls button:active { background: rgba(23, 105, 255, .68); transform: scale(.96); }
-        @media (max-width: 800px), (pointer: coarse) {
-            #mobile-controls {
-                display: flex; position: fixed; z-index: 20; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom));
-                transform: translateX(-50%); gap: 10px; padding: 7px; border: 1px solid rgba(255,255,255,.1);
-                border-radius: 20px; background: rgba(3, 8, 18, .58); backdrop-filter: blur(10px);
-            }
-            #brightness-panel { bottom: calc(78px + env(safe-area-inset-bottom)); }
-        }
-        #brightness-slider { width: 100%; margin-top: 10px; accent-color: #a78bfa; touch-action: auto; }
-        .glass-panel {
-            background: rgba(10, 14, 26, 0.65);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
         #info-panel {
             position: fixed; top: 16px; left: 16px; z-index: 20;
-            color: #e9f5ff; background: rgba(5, 11, 24, .88);
-            border: 1px solid rgba(120, 190, 255, .24); border-radius: 16px;
-            padding: 12px 16px; font: 12px/1.4 system-ui, sans-serif;
-            backdrop-filter: blur(14px); box-shadow: 0 8px 32px rgba(0,0,0,.35);
+            color: #fff; background: rgba(0,0,0,0.7);
+            border-radius: 12px; padding: 12px 16px;
+            font: 12px system-ui, sans-serif; backdrop-filter: blur(10px);
         }
         #shape-name {
-            font-size: 14px; font-weight: 600; color: #fff;
+            font-size: 14px; font-weight: 600;
             background: linear-gradient(90deg, #8b5cf6, #06b6d4);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
             margin-bottom: 4px;
         }
+        #loading {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-size: 18px; z-index: 100;
+            background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px;
+        }
+        #error-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff4444; font-size: 16px; z-index: 100;
+            background: rgba(0,0,0,0.9); padding: 20px; border-radius: 10px;
+            text-align: center; display: none;
+        }
+        #controls {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 20; display: flex; gap: 10px; flex-wrap: wrap;
+            justify-content: center; padding: 10px;
+            background: rgba(0,0,0,0.5); border-radius: 15px; backdrop-filter: blur(10px);
+        }
+        #controls button {
+            width: 44px; height: 44px; border: none; border-radius: 12px;
+            background: rgba(255,255,255,0.1); color: white;
+            font-size: 18px; cursor: pointer; transition: all 0.2s;
+        }
+        #controls button:hover { background: rgba(255,255,255,0.2); transform: scale(1.05); }
+        #controls button:active { transform: scale(0.95); }
+        @media (max-width: 600px) {
+            #controls { gap: 8px; }
+            #controls button { width: 40px; height: 40px; font-size: 16px; }
+        }
     </style>
 </head>
 <body>
+    <div id="loading">Chargement de Three.js...</div>
+    <div id="error-panel"></div>
     <div id="canvas-container"></div>
-    
     <div id="info-panel">
-        <div id="shape-name">Initializing...</div>
-        <div style="color: #9ca3af; font-size: 11px;">
+        <div id="shape-name">Keadex</div>
+        <div style="color: #aaa; font-size: 11px;">
             <span id="shape-index">0</span> | 
             <span id="morph-progress-text">0%</span> | 
-            <span id="fps-counter">60 FPS</span>
+            <span id="fps-counter">0 FPS</span>
         </div>
     </div>
-
-    <div id="brightness-panel" role="group" aria-label="Réglage de luminosité">
-        <label for="brightness-slider">Luminosité <span id="brightness-value">50 %</span></label>
-        <input id="brightness-slider" type="range" min="0" max="1" step="0.01" value="0.5" aria-label="Luminosité">
-        <div style="margin-top:6px;color:#9ca3af;font-size:11px">B pour fermer</div>
-    </div>
-    
-    <div id="mobile-controls" role="group" aria-label="Commandes">
-        <button id="mobile-pause" type="button" aria-label="Pause" title="Pause">Ⅱ</button>
-        <button id="mobile-random" type="button" aria-label="Aléatoire" title="Forme aléatoire">🎲</button>
-        <button id="mobile-brightness" type="button" aria-label="Luminosité" title="Luminosité">☼</button>
-        <button id="mobile-info" type="button" aria-label="Infos" title="Infos">ℹ️</button>
+    <div id="controls">
+        <button id="btn-prev" title="Précédent">←</button>
+        <button id="btn-pause" title="Pause">⏸</button>
+        <button id="btn-next" title="Suivant">→</button>
+        <button id="btn-random" title="Aléatoire">🎲</button>
+        <button id="btn-palette" title="Couleurs">🎨</button>
     </div>
 
-    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-auto flex items-center gap-3 glass-panel px-5 py-3 rounded-2xl shadow-2xl">
-        <button id="btn-prev" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
-            <i class="fa-solid fa-backward-step"></i>
-        </button>
-        <button id="btn-pause" class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white flex items-center justify-center transition shadow-lg shadow-purple-600/30 hover:scale-105 active:scale-95">
-            <i id="pause-icon" class="fa-solid fa-pause"></i>
-        </button>
-        <button id="btn-next" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
-            <i class="fa-solid fa-forward-step"></i>
-        </button>
-        <div class="h-6 w-px bg-white/10 mx-1"></div>
-        <button id="btn-random" class="px-4 h-10 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 text-emerald-300 hover:text-white flex items-center gap-2 text-xs font-medium transition border border-emerald-500/30 hover:scale-105 active:scale-95">
-            <i class="fa-solid fa-dice text-emerald-400"></i> Random
-        </button>
-        <button id="btn-palette" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
-            <i class="fa-solid fa-palette text-amber-400"></i>
-        </button>
-    </div>
+    <!-- Charger Three.js localement si CDN échoue -->
+    <script>
+        window.THREE_LOADED = false;
+        function loadThreeJS() {
+            return new Promise((resolve, reject) => {
+                if (window.THREE) {
+                    window.THREE_LOADED = true;
+                    return resolve();
+                }
+                
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+                script.onload = () => {
+                    window.THREE_LOADED = true;
+                    resolve();
+                };
+                script.onerror = () => reject(new Error('Three.js CDN failed'));
+                document.head.appendChild(script);
+            });
+        }
+        
+        function loadOrbitControls() {
+            return new Promise((resolve, reject) => {
+                if (window.THREE && window.THREE.OrbitControls) {
+                    return resolve();
+                }
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js';
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error('OrbitControls CDN failed'));
+                document.head.appendChild(script);
+            });
+        }
+    </script>
 
     <script>
+// ============================================
 // KEADEX - Infinite Morphing Universe
-// Systeme generatif de formes 3D en morphing continu avec variete infinie
+// Version simplifiée et robuste
+// ============================================
 
+// Configuration
 const CONFIG = {
-    particleCount: 120000,
-    rotationSpeed: 0.2,
-    morphDuration: 8,
-    transitionDuration: 3,
-    shapeVariety: 15,
-    complexityRange: [0.3, 1],
-    symmetryFactor: 0.7,
-    infiniteMode: true,
-    randomnessFactor: 0.85,
-    quality: 'high',
-    useGradients: true,
-    colorIntensity: 0.8
+    particleCount: 80000,
+    rotationSpeed: 0.15,
+    morphDuration: 6,
+    transitionDuration: 2.5,
+    quality: 'high'
 };
 
-const RECOGNIZABLE_SHAPES = [
-    { name: 'Cube', icon: 'fa-cube', base: 'box' },
-    { name: 'Sphere', icon: 'fa-circle', base: 'sphere' },
-    { name: 'Torus', icon: 'fa-ring', base: 'torus' },
-    { name: 'Cone', icon: 'fa-triangle-exclamation', base: 'cone' },
-    { name: 'Cylinder', icon: 'fa-circle', base: 'cylinder' },
-    { name: 'Tetrahedron', icon: 'fa-mountain', base: 'tetrahedron' },
-    { name: 'Octahedron', icon: 'fa-gem', base: 'octahedron' },
-    { name: 'Icosahedron', icon: 'fa-snowflake', base: 'icosahedron' },
-    { name: 'Dodecahedron', icon: 'fa-futbol', base: 'dodecahedron' },
-    { name: 'Star', icon: 'fa-star', base: 'star' },
-    { name: 'Heart', icon: 'fa-heart', base: 'heart' },
-    { name: 'Spiral', icon: 'fa-spiral', base: 'spiral' },
-    { name: 'Helix', icon: 'fa-dna', base: 'helix' },
-    { name: 'Wave', icon: 'fa-wave-square', base: 'wave' },
-    { name: 'Fractal', icon: 'fa-sitemap', base: 'fractal' }
+// Formes reconnaissables
+const SHAPES = [
+    'box', 'sphere', 'torus', 'cone', 'cylinder',
+    'tetrahedron', 'octahedron', 'icosahedron', 'dodecahedron',
+    'star', 'heart', 'spiral', 'helix', 'wave', 'fractal'
 ];
 
+// Palettes
 const PALETTES = [
-    { name: 'Cosmic', colors: [0x8b5cf6, 0x06b6d4, 0x3b82f6, 0xec4899, 0xf59e0b], fog: 0x000000, ambient: 0x222244 },
-    { name: 'Nebula', colors: [0xef4444, 0xf59e0b, 0x84cc16, 0x22c55e, 0x06b6d4], fog: 0x0a0a1a, ambient: 0x331133 },
-    { name: 'Aurora', colors: [0x06b6d4, 0x22c55e, 0xa855f7, 0xec4899, 0xf97316], fog: 0x000011, ambient: 0x112233 },
-    { name: 'Quantum', colors: [0x3b82f6, 0x8b5cf6, 0xec4899, 0xf97316, 0xeab308], fog: 0x000000, ambient: 0x441144 },
-    { name: 'Void', colors: [0xffffff, 0xaaaaaa, 0x666666, 0x333333, 0x000000], fog: 0x000000, ambient: 0x000000 }
+    [0x8b5cf6, 0x06b6d4, 0x3b82f6, 0xec4899],
+    [0xef4444, 0xf59e0b, 0x22c55e, 0x06b6d4],
+    [0x06b6d4, 0x22c55e, 0xa855f7, 0xec4899],
+    [0x3b82f6, 0x8b5cf6, 0xec4899, 0xf97316],
+    [0xffffff, 0xaaaaaa, 0x666666, 0x333333]
 ];
 
-const MemorySystem = {
-    history: [],
-    maxHistory: 8,
-    lastShapes: [],
-    record: function(shapeName) {
-        this.history.push({ name: shapeName, time: Date.now() });
-        if (this.history.length > this.maxHistory) this.history.shift();
-        this.lastShapes = this.history.map(h => h.name);
-    },
-    getRecentShapes: function() {
-        return this.lastShapes.slice(-4);
-    },
-    shouldAvoid: function(shapeName) {
-        const recent = this.getRecentShapes();
-        const count = recent.filter(s => s === shapeName).length;
-        return count >= 2;
-    }
-};
+// État
+let system = null;
+let currentShapeIndex = 0;
+let nextShapeIndex = 1;
+let isMorphing = false;
+let morphProgress = 0;
+let isPaused = false;
+let paletteIndex = 0;
+let shapeCounter = 0;
+let particles = null;
+let scene, camera, renderer, controls;
 
-const ShapeGenerator = {
-    currentShape: null,
-    nextShape: null,
-    morphProgress: 0,
-    isMorphing: false,
-    isPaused: false,
-    currentPaletteIndex: 0,
-    shapeIndex: 0,
-    
-    generateRandomShape: function() {
-        const availableShapes = RECOGNIZABLE_SHAPES.filter(
-            shape => !MemorySystem.shouldAvoid(shape.name)
-        );
-        const shapesToChoose = availableShapes.length > 0 ? availableShapes : RECOGNIZABLE_SHAPES;
-        const randomIndex = Math.floor(Math.random() * shapesToChoose.length);
-        const shape = shapesToChoose[randomIndex];
-        const complexity = CONFIG.complexityRange[0] + Math.random() * (CONFIG.complexityRange[1] - CONFIG.complexityRange[0]);
-        const symmetry = CONFIG.symmetryFactor * (0.8 + Math.random() * 0.4);
-        const scale = 0.8 + Math.random() * 0.4;
-        return {
-            name: shape.name,
-            base: shape.base,
-            complexity: complexity,
-            symmetry: symmetry,
-            scale: scale,
-            rotation: Math.random() * Math.PI * 2,
-            seed: Math.random() * 10000
-        };
-    },
-    generateNextShape: function() {
-        const newShape = this.generateRandomShape();
-        MemorySystem.record(newShape.name);
-        this.shapeIndex++;
-        return newShape;
-    },
-    selectShape: function(index) {
-        const shape = RECOGNIZABLE_SHAPES[index % RECOGNIZABLE_SHAPES.length];
-        MemorySystem.record(shape.name);
-        this.shapeIndex++;
-        return {
-            name: shape.name,
-            base: shape.base,
-            complexity: 0.7,
-            symmetry: 0.8,
-            scale: 1.0,
-            rotation: 0,
-            seed: Date.now()
-        };
-    },
-    nextPalette: function() {
-        this.currentPaletteIndex = (this.currentPaletteIndex + 1) % PALETTES.length;
-        return PALETTES[this.currentPaletteIndex];
-    },
-    getCurrentPalette: function() {
-        return PALETTES[this.currentPaletteIndex];
-    }
-};
-
-const ProceduralGeometry = {
-    createBaseGeometry: function(shape, count) {
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(count * 3);
-        const colors = new Float32Array(count * 3);
-        const sizes = new Float32Array(count);
-        const palette = ShapeGenerator.getCurrentPalette();
-        const colorCount = palette.colors.length;
+// Attendre que Three.js soit chargé
+async function init() {
+    try {
+        document.getElementById('loading').textContent = 'Chargement des bibliothèques...';
         
-        const noise = (x, y, z, seed) => {
-            const n = x + y * 57 + z * 113 + seed * 131;
-            return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0 * 2 - 1;
-        };
+        // Attendre Three.js
+        await loadThreeJS();
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        const mapToShape = (i, shape, seed) => {
-            let x, y, z;
-            switch(shape.base) {
-                case 'box':
-                    x = (Math.random() - 0.5) * 2 * shape.scale;
-                    y = (Math.random() - 0.5) * 2 * shape.scale;
-                    z = (Math.random() - 0.5) * 2 * shape.scale;
-                    const deform = noise(x, y, z, seed) * shape.complexity * 0.3;
-                    x += deform * (Math.random() - 0.5);
-                    y += deform * (Math.random() - 0.5);
-                    z += deform * (Math.random() - 0.5);
-                    break;
-                case 'sphere':
-                    const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.acos(2 * Math.random() - 1);
-                    const r = Math.pow(Math.random(), 1/3);
-                    x = r * Math.sin(phi) * Math.cos(theta) * shape.scale;
-                    y = r * Math.sin(phi) * Math.sin(theta) * shape.scale;
-                    z = r * Math.cos(phi) * shape.scale;
-                    const perturb = noise(x, y, z, seed) * shape.complexity * 0.4;
-                    const dir = Math.sqrt(x*x + y*y + z*z);
-                    if (dir > 0) {
-                        x += x/dir * perturb;
-                        y += y/dir * perturb;
-                        z += z/dir * perturb;
-                    }
-                    break;
-                case 'torus':
-                    const majorRadius = 1.0 * shape.scale;
-                    const minorRadius = 0.3 + shape.complexity * 0.2;
-                    const u = Math.random() * Math.PI * 2;
-                    const v = Math.random() * Math.PI * 2;
-                    x = (majorRadius + minorRadius * Math.cos(v)) * Math.cos(u) * shape.scale;
-                    y = (majorRadius + minorRadius * Math.cos(v)) * Math.sin(u) * shape.scale;
-                    z = minorRadius * Math.sin(v) * shape.scale;
-                    const torusDeform = noise(x, y, z, seed) * shape.complexity * 0.2;
-                    x += (Math.random() - 0.5) * torusDeform;
-                    y += (Math.random() - 0.5) * torusDeform;
-                    break;
-                case 'cone':
-                    const height = 2.0 * shape.scale;
-                    const radius = 1.0 * shape.scale;
-                    const t = Math.random();
-                    const angle = Math.random() * Math.PI * 2;
-                    x = radius * Math.sqrt(t) * Math.cos(angle) * shape.scale;
-                    y = height * (1 - t) * shape.scale - height/2;
-                    z = radius * Math.sqrt(t) * Math.sin(angle) * shape.scale;
-                    break;
-                case 'cylinder':
-                    const cylHeight = 2.0 * shape.scale;
-                    const cylRadius = 0.8 * shape.scale;
-                    const t2 = Math.random();
-                    const angle2 = Math.random() * Math.PI * 2;
-                    x = cylRadius * Math.cos(angle2) * shape.scale;
-                    y = cylHeight * (t2 - 0.5) * shape.scale;
-                    z = cylRadius * Math.sin(angle2) * shape.scale;
-                    break;
-                case 'tetrahedron':
-                    const tetraVertices = [[1,1,1], [-1,-1,1], [-1,1,-1], [1,-1,-1]];
-                    const idx = Math.floor(Math.random() * 4);
-                    x = tetraVertices[idx][0] * shape.scale * (0.7 + Math.random() * 0.3);
-                    y = tetraVertices[idx][1] * shape.scale * (0.7 + Math.random() * 0.3);
-                    z = tetraVertices[idx][2] * shape.scale * (0.7 + Math.random() * 0.3);
-                    break;
-                case 'octahedron':
-                    const octaVertices = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
-                    const idx2 = Math.floor(Math.random() * 6);
-                    x = octaVertices[idx2][0] * shape.scale * (0.8 + Math.random() * 0.2);
-                    y = octaVertices[idx2][1] * shape.scale * (0.8 + Math.random() * 0.2);
-                    z = octaVertices[idx2][2] * shape.scale * (0.8 + Math.random() * 0.2);
-                    break;
-                case 'icosahedron':
-                    const goldenRatio = (1 + Math.sqrt(5)) / 2;
-                    const icoVertices = [
-                        [0,1,goldenRatio],[0,1,-goldenRatio],[0,-1,goldenRatio],[0,-1,-goldenRatio],
-                        [1,goldenRatio,0],[1,-goldenRatio,0],[-1,goldenRatio,0],[-1,-goldenRatio,0],
-                        [goldenRatio,0,1],[goldenRatio,0,-1],[-goldenRatio,0,1],[-goldenRatio,0,-1]
-                    ];
-                    const idx3 = Math.floor(Math.random() * 12);
-                    const v = icoVertices[idx3];
-                    const norm = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
-                    x = (v[0]/norm)*shape.scale*(0.9+Math.random()*0.1);
-                    y = (v[1]/norm)*shape.scale*(0.9+Math.random()*0.1);
-                    z = (v[2]/norm)*shape.scale*(0.9+Math.random()*0.1);
-                    break;
-                case 'star':
-                    const outerRadius = 1.0 * shape.scale;
-                    const innerRadius = 0.4 * shape.scale;
-                    const angle3 = Math.random() * Math.PI * 2;
-                    const point = Math.floor(Math.random() * 10);
-                    const radius3 = (point % 2 === 0) ? outerRadius : innerRadius;
-                    x = radius3 * Math.cos(angle3) * shape.scale;
-                    y = radius3 * Math.sin(angle3) * shape.scale;
-                    z = (Math.random() - 0.5) * 0.2 * shape.scale;
-                    break;
-                case 'heart':
-                    const t3 = Math.random() * Math.PI * 2;
-                    x = 16 * Math.pow(Math.sin(t3), 3) * shape.scale * 0.1;
-                    y = (13 * Math.cos(t3) - 5 * Math.cos(2*t3) - 2 * Math.cos(3*t3) - Math.cos(4*t3)) * shape.scale * 0.1;
-                    z = (Math.random() - 0.5) * 0.3 * shape.scale;
-                    break;
-                case 'spiral':
-                    const spiralT = Math.random() * Math.PI * 10;
-                    const spiralR = spiralT * 0.1 * shape.scale;
-                    x = spiralR * Math.cos(spiralT) * shape.scale;
-                    y = spiralR * Math.sin(spiralT) * shape.scale;
-                    z = spiralT * 0.05 * shape.scale;
-                    break;
-                case 'helix':
-                    const helixT = Math.random() * Math.PI * 10;
-                    x = Math.cos(helixT) * shape.scale;
-                    y = helixT * 0.1 * shape.scale;
-                    z = Math.sin(helixT) * shape.scale;
-                    break;
-                case 'wave':
-                    x = (Math.random() - 0.5) * 4 * shape.scale;
-                    y = Math.sin(x * 2) * 0.5 * shape.scale;
-                    z = (Math.random() - 0.5) * 0.5 * shape.scale;
-                    break;
-                case 'fractal':
-                    let fx = 0, fy = 0, fz = 0;
-                    for (let iter = 0; iter < 5; iter++) {
-                        const angle = Math.random() * Math.PI * 2;
-                        const dist = Math.pow(Math.random(), 2) * 2;
-                        fx += Math.cos(angle) * dist;
-                        fy += Math.sin(angle) * dist;
-                        fz += (Math.random() - 0.5) * dist * 0.3;
-                    }
-                    x = fx * shape.scale * 0.2;
-                    y = fy * shape.scale * 0.2;
-                    z = fz * shape.scale * 0.2;
-                    break;
-                default:
-                    x = (Math.random() - 0.5) * 2 * shape.scale;
-                    y = (Math.random() - 0.5) * 2 * shape.scale;
-                    z = (Math.random() - 0.5) * 2 * shape.scale;
-            }
-            return { x, y, z };
-        };
-        
-        for (let i = 0; i < count; i++) {
-            const pos = mapToShape(i, shape, shape.seed);
-            positions[i * 3] = pos.x;
-            positions[i * 3 + 1] = pos.y;
-            positions[i * 3 + 2] = pos.z;
-            const colorIndex = Math.floor(Math.random() * colorCount);
-            const color = new THREE.Color(palette.colors[colorIndex]);
-            colors[i * 3] = color.r;
-            colors[i * 3 + 1] = color.g;
-            colors[i * 3 + 2] = color.b;
-            sizes[i] = 0.02 + Math.random() * 0.08;
+        if (!window.THREE) {
+            throw new Error('Three.js non chargé');
         }
         
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-        return geometry;
-    },
-    
-    lerpGeometries: function(geom1, geom2, progress, targetCount) {
-        const positions1 = geom1.attributes.position.array;
-        const positions2 = geom2.attributes.position.array;
-        const colors1 = geom1.attributes.color.array;
-        const colors2 = geom2.attributes.color.array;
-        const sizes1 = geom1.attributes.size.array;
-        const sizes2 = geom2.attributes.size.array;
-        const count = Math.min(positions1.length / 3, positions2.length / 3, targetCount);
-        const newPositions = new Float32Array(count * 3);
-        const newColors = new Float32Array(count * 3);
-        const newSizes = new Float32Array(count);
+        await loadOrbitControls();
+        await new Promise(resolve => setTimeout(resolve, 100));
         
-        for (let i = 0; i < count; i++) {
-            const idx = i * 3;
-            const p1x = positions1[idx];
-            const p1y = positions1[idx + 1];
-            const p1z = positions1[idx + 2];
-            const p2x = positions2[idx % (positions2.length)];
-            const p2y = positions2[(idx + 1) % (positions2.length)];
-            const p2z = positions2[(idx + 2) % (positions2.length)];
-            newPositions[idx] = p1x + (p2x - p1x) * progress;
-            newPositions[idx + 1] = p1y + (p2y - p1y) * progress;
-            newPositions[idx + 2] = p1z + (p2z - p1z) * progress;
-            newColors[idx] = colors1[idx] + (colors2[idx % colors2.length] - colors1[idx]) * progress;
-            newColors[idx + 1] = colors1[idx + 1] + (colors2[(idx + 1) % colors2.length] - colors1[idx + 1]) * progress;
-            newColors[idx + 2] = colors1[idx + 2] + (colors2[(idx + 2) % colors2.length] - colors1[idx + 2]) * progress;
-            newSizes[i] = sizes1[i % sizes1.length] + (sizes2[i % sizes2.length] - sizes1[i % sizes1.length]) * progress;
+        if (!window.THREE.OrbitControls) {
+            throw new Error('OrbitControls non chargé');
         }
         
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
-        geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
-        geometry.setAttribute('size', new THREE.BufferAttribute(newSizes, 1));
-        return geometry;
-    }
-};
-
-class KeadexSystem {
-    constructor() {
-        this.initThreeJS();
-        this.initParticles();
-        this.initControls();
-        this.initEventListeners();
-        ShapeGenerator.currentShape = ShapeGenerator.generateNextShape();
-        ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-        this.updateInfoPanel();
-        this.clock = new THREE.Clock();
-        this.morphStartTime = 0;
-        this.animate();
-    }
-    
-    initThreeJS() {
-        this.container = document.getElementById('canvas-container');
-        this.scene = new THREE.Scene();
-        const palette = ShapeGenerator.getCurrentPalette();
-        this.scene.fog = new THREE.FogExp2(palette.fog, 0.004);
-        this.scene.background = new THREE.Color(palette.fog);
-        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.camera.position.set(0, 0, 30);
-        this.camera.updateProjectionMatrix();
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance", alpha: true });
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0;
-        this.container.appendChild(this.renderer.domElement);
-        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.enableDamping = true;
-        this.controls.dampingFactor = 0.05;
-        this.controls.maxDistance = 150;
-        this.controls.minDistance = 15;
-        this.controls.rotateSpeed = 0.8;
-        this.controls.zoomSpeed = 1.0;
-        this.ambientLight = new THREE.AmbientLight(ShapeGenerator.getCurrentPalette().ambient, 0.4);
-        this.scene.add(this.ambientLight);
-        this.pointLight = new THREE.PointLight(0xffffff, 0.8, 100);
-        this.pointLight.position.set(20, 20, 20);
-        this.scene.add(this.pointLight);
-    }
-    
-    initParticles() {
-        let particleCount = CONFIG.particleCount;
-        if (CONFIG.quality === 'low') particleCount = Math.floor(CONFIG.particleCount * 0.4);
-        else if (CONFIG.quality === 'medium') particleCount = Math.floor(CONFIG.particleCount * 0.7);
-        const geometry = ProceduralGeometry.createBaseGeometry(ShapeGenerator.currentShape, particleCount);
-        const material = new THREE.PointsMaterial({
-            size: 0.05,
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.9,
-            sizeAttenuation: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false
-        });
-        this.particles = new THREE.Points(geometry, material);
-        this.scene.add(this.particles);
-        this.currentGeometry = geometry;
-        this.targetGeometry = null;
-        this.particleCount = particleCount;
-    }
-    
-    initControls() {
-        document.getElementById('btn-prev').addEventListener('click', () => {
-            ShapeGenerator.nextShape = ShapeGenerator.selectShape(
-                RECOGNIZABLE_SHAPES.findIndex(s => s.name === ShapeGenerator.currentShape.name) - 1
-            );
-            this.startMorph();
-        });
-        document.getElementById('btn-next').addEventListener('click', () => {
-            ShapeGenerator.nextShape = ShapeGenerator.selectShape(
-                RECOGNIZABLE_SHAPES.findIndex(s => s.name === ShapeGenerator.currentShape.name) + 1
-            );
-            this.startMorph();
-        });
-        document.getElementById('btn-pause').addEventListener('click', () => {
-            ShapeGenerator.isPaused = !ShapeGenerator.isPaused;
-            const icon = document.getElementById('pause-icon');
-            icon.className = ShapeGenerator.isPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
-        });
-        document.getElementById('btn-random').addEventListener('click', () => {
-            ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-            this.startMorph();
-        });
-        document.getElementById('btn-palette').addEventListener('click', () => {
-            const palette = ShapeGenerator.nextPalette();
-            this.scene.fog.color.setHex(palette.fog);
-            this.scene.background.setHex(palette.fog);
-            this.ambientLight.color.setHex(palette.ambient);
-            this.recreateParticles();
-        });
-        document.getElementById('mobile-pause').addEventListener('click', () => {
-            ShapeGenerator.isPaused = !ShapeGenerator.isPaused;
-        });
-        document.getElementById('mobile-random').addEventListener('click', () => {
-            ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-            this.startMorph();
-        });
-        document.getElementById('mobile-brightness').addEventListener('click', () => {
-            const panel = document.getElementById('brightness-panel');
-            panel.classList.toggle('visible');
-        });
-        document.getElementById('brightness-slider').addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            document.getElementById('brightness-value').textContent = Math.round(value * 100) + ' %';
-            this.particles.material.opacity = 0.3 + value * 0.7;
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === ' ') {
-                ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-                this.startMorph();
-            } else if (e.key === 'ArrowLeft') {
-                ShapeGenerator.nextShape = ShapeGenerator.selectShape(
-                    RECOGNIZABLE_SHAPES.findIndex(s => s.name === ShapeGenerator.currentShape.name) - 1
-                );
-                this.startMorph();
-            } else if (e.key === 'ArrowRight') {
-                ShapeGenerator.nextShape = ShapeGenerator.selectShape(
-                    RECOGNIZABLE_SHAPES.findIndex(s => s.name === ShapeGenerator.currentShape.name) + 1
-                );
-                this.startMorph();
-            } else if (e.key === 'p' || e.key === 'P') {
-                ShapeGenerator.isPaused = !ShapeGenerator.isPaused;
-                const icon = document.getElementById('pause-icon');
-                icon.className = ShapeGenerator.isPaused ? 'fa-solid fa-play' : 'fa-solid fa-pause';
-            } else if (e.key === 'c' || e.key === 'C') {
-                ShapeGenerator.nextPalette();
-                const palette = ShapeGenerator.getCurrentPalette();
-                this.scene.fog.color.setHex(palette.fog);
-                this.scene.background.setHex(palette.fog);
-                this.ambientLight.color.setHex(palette.ambient);
-                this.recreateParticles();
-            } else if (e.key === 'b' || e.key === 'B') {
-                const panel = document.getElementById('brightness-panel');
-                panel.classList.toggle('visible');
-            } else if (e.key === 'm' || e.key === 'M') {
-                const panel = document.getElementById('info-panel');
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            }
-        });
-        this.renderer.domElement.addEventListener('click', (e) => {
-            if (e.button === 0) {
-                ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-                this.startMorph();
-            }
-        });
-    }
-    
-    initEventListeners() {
-        window.addEventListener('resize', () => {
-            this.camera.aspect = window.innerWidth / window.innerHeight;
-            this.camera.updateProjectionMatrix();
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    }
-    
-    startMorph() {
-        ShapeGenerator.isMorphing = true;
-        ShapeGenerator.morphProgress = 0;
-        this.morphStartTime = this.clock.getElapsedTime();
-        this.targetGeometry = ProceduralGeometry.createBaseGeometry(ShapeGenerator.nextShape, this.particleCount);
-    }
-    
-    recreateParticles() {
-        const geometry = ProceduralGeometry.createBaseGeometry(ShapeGenerator.currentShape, this.particleCount);
-        this.particles.geometry.dispose();
-        this.particles.geometry = geometry;
-        this.currentGeometry = geometry;
-        if (ShapeGenerator.isMorphing) {
-            this.targetGeometry = ProceduralGeometry.createBaseGeometry(ShapeGenerator.nextShape, this.particleCount);
+        document.getElementById('loading').textContent = 'Initialisation de la scène...';
+        
+        // Vérifier les performances
+        const isMobile = window.matchMedia('(max-width: 800px)').matches || 
+                        (navigator.maxTouchPoints || 0) > 0;
+        const isLowPower = (navigator.hardwareConcurrency || 8) <= 4 || 
+                          (navigator.deviceMemory || 8) <= 4;
+        
+        if (isMobile || isLowPower) {
+            CONFIG.particleCount = Math.floor(CONFIG.particleCount * 0.4);
         }
-    }
-    
-    updateInfoPanel() {
-        document.getElementById('shape-name').textContent = ShapeGenerator.currentShape.name;
-        document.getElementById('shape-index').textContent = ShapeGenerator.shapeIndex;
-    }
-    
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        if (!ShapeGenerator.isPaused) {
-            const elapsed = this.clock.getElapsedTime();
-            const delta = this.clock.getDelta();
-            this.particles.rotation.y += CONFIG.rotationSpeed * delta * 0.1;
-            if (CONFIG.infiniteMode && !ShapeGenerator.isMorphing) {
-                const morphTimer = elapsed % (CONFIG.morphDuration + CONFIG.transitionDuration);
-                if (morphTimer > CONFIG.morphDuration) {
-                    ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-                    this.startMorph();
-                }
-            }
-            if (ShapeGenerator.isMorphing) {
-                const morphElapsed = elapsed - this.morphStartTime;
-                ShapeGenerator.morphProgress = Math.min(1.0, morphElapsed / CONFIG.transitionDuration);
-                const morphedGeometry = ProceduralGeometry.lerpGeometries(
-                    this.currentGeometry, this.targetGeometry, ShapeGenerator.morphProgress, this.particleCount
-                );
-                this.particles.geometry.dispose();
-                this.particles.geometry = morphedGeometry;
-                const progressPercent = Math.round(ShapeGenerator.morphProgress * 100);
-                document.getElementById('morph-progress-text').textContent = progressPercent + '%';
-                if (ShapeGenerator.morphProgress >= 1.0) {
-                    ShapeGenerator.isMorphing = false;
-                    ShapeGenerator.currentShape = ShapeGenerator.nextShape;
-                    this.currentGeometry = this.targetGeometry;
-                    this.updateInfoPanel();
-                    if (CONFIG.infiniteMode) {
-                        ShapeGenerator.nextShape = ShapeGenerator.generateNextShape();
-                    }
-                }
-            }
-            this.controls.update();
-        }
-        this.frameCount = (this.frameCount || 0) + 1;
-        const now = performance.now();
-        if (!this.lastFpsTime || now - this.lastFpsTime >= 1000) {
-            const fps = this.frameCount;
-            document.getElementById('fps-counter').textContent = fps + ' FPS';
-            this.frameCount = 0;
-            this.lastFpsTime = now;
-        }
-        this.renderer.render(this.scene, this.camera);
+        
+        // Initialiser Three.js
+        initThreeJS();
+        initParticles();
+        initControls();
+        
+        // Masquer le chargement
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('info-panel').style.display = 'block';
+        document.getElementById('controls').style.display = 'flex';
+        
+        // Démarrer l'animation
+        animate();
+        
+    } catch (error) {
+        showError(error.message);
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    const compactDevice = window.matchMedia('(max-width: 800px)').matches || (navigator.maxTouchPoints || 0) > 0;
-    const lowPowerDevice = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
-    if (compactDevice || lowPowerDevice) {
-        CONFIG.particleCount = Math.floor(CONFIG.particleCount * 0.5);
-        CONFIG.quality = 'medium';
-    }
-    new KeadexSystem();
-});
+function showError(message) {
+    const errorPanel = document.getElementById('error-panel');
+    errorPanel.textContent = 'Erreur: ' + message + '\n\nVeuillez recharger la page.';
+    errorPanel.style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+    console.error('KEADEX Error:', message);
+}
 
-window.addEventListener('error', (e) => {
-    console.error('Erreur:', e.message);
-    document.body.innerHTML += `<div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; text-align: center;"><h2>Erreur de chargement</h2><p>${e.message}</p><p style="margin-top: 10px; font-size: 12px;">Veuillez recharger la page</p></div>`;
-});
+function initThreeJS() {
+    const container = document.getElementById('canvas-container');
+    
+    scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000000, 0.003);
+    scene.background = new THREE.Color(0x000000);
+    
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 25);
+    camera.updateProjectionMatrix();
+    
+    renderer = new THREE.WebGLRenderer({ 
+        antialias: true, 
+        powerPreference: "high-performance",
+        alpha: true
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    container.appendChild(renderer.domElement);
+    
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxDistance = 100;
+    controls.minDistance = 10;
+    controls.rotateSpeed = 0.8;
+    
+    // Lumière
+    const ambientLight = new THREE.AmbientLight(0x333366, 0.5);
+    scene.add(ambientLight);
+    
+    const pointLight = new THREE.PointLight(0xffffff, 0.8, 100);
+    pointLight.position.set(20, 20, 20);
+    scene.add(pointLight);
+    
+    // Gestion du redimensionnement
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+}
+
+function initParticles() {
+    const geometry = createShapeGeometry(SHAPES[currentShapeIndex], CONFIG.particleCount);
+    
+    const material = new THREE.PointsMaterial({
+        size: 0.04,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85,
+        sizeAttenuation: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+    });
+    
+    particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+    
+    // Stocker les géométries
+    window.currentGeometry = geometry;
+    window.targetGeometry = null;
+    window.particleCount = CONFIG.particleCount;
+    
+    updateInfoPanel();
+}
+
+function createShapeGeometry(shapeType, count) {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    
+    const palette = PALETTES[paletteIndex];
+    const colorCount = palette.length;
+    
+    // Générateur de bruit pseudo-aléatoire
+    function noise(x, y, z, seed) {
+        const n = x + y * 57 + z * 113 + seed * 131;
+        return ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0 * 2 - 1;
+    }
+    
+    function getShapePoint(i, shapeType, seed) {
+        let x, y, z;
+        const scale = 1.0;
+        const complexity = 0.7;
+        
+        switch(shapeType) {
+            case 'box':
+                x = (Math.random() - 0.5) * 2 * scale;
+                y = (Math.random() - 0.5) * 2 * scale;
+                z = (Math.random() - 0.5) * 2 * scale;
+                const deform = noise(x, y, z, seed) * complexity * 0.4;
+                x += deform * (Math.random() - 0.5) * 0.3;
+                y += deform * (Math.random() - 0.5) * 0.3;
+                z += deform * (Math.random() - 0.5) * 0.3;
+                break;
+                
+            case 'sphere':
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(2 * Math.random() - 1);
+                const r = Math.pow(Math.random(), 1/3);
+                x = r * Math.sin(phi) * Math.cos(theta) * scale;
+                y = r * Math.sin(phi) * Math.sin(theta) * scale;
+                z = r * Math.cos(phi) * scale;
+                const perturb = noise(x, y, z, seed) * complexity * 0.5;
+                const dir = Math.sqrt(x*x + y*y + z*z);
+                if (dir > 0) {
+                    x += x/dir * perturb * 0.3;
+                    y += y/dir * perturb * 0.3;
+                    z += z/dir * perturb * 0.3;
+                }
+                break;
+                
+            case 'torus':
+                const majorRadius = 1.0 * scale;
+                const minorRadius = 0.3 + complexity * 0.15;
+                const u = Math.random() * Math.PI * 2;
+                const v = Math.random() * Math.PI * 2;
+                x = (majorRadius + minorRadius * Math.cos(v)) * Math.cos(u) * scale;
+                y = (majorRadius + minorRadius * Math.cos(v)) * Math.sin(u) * scale;
+                z = minorRadius * Math.sin(v) * scale;
+                break;
+                
+            case 'cone':
+                const height = 2.0 * scale;
+                const radius = 1.0 * scale;
+                const t = Math.random();
+                const angle = Math.random() * Math.PI * 2;
+                x = radius * Math.sqrt(t) * Math.cos(angle) * scale;
+                y = height * (1 - t) * scale - height/2;
+                z = radius * Math.sqrt(t) * Math.sin(angle) * scale;
+                break;
+                
+            case 'cylinder':
+                const cylHeight = 2.0 * scale;
+                const cylRadius = 0.8 * scale;
+                const t2 = Math.random();
+                const angle2 = Math.random() * Math.PI * 2;
+                x = cylRadius * Math.cos(angle2) * scale;
+                y = cylHeight * (t2 - 0.5) * scale;
+                z = cylRadius * Math.sin(angle2) * scale;
+                break;
+                
+            case 'tetrahedron':
+                const tetraVertices = [[1,1,1], [-1,-1,1], [-1,1,-1], [1,-1,-1]];
+                const idx = Math.floor(Math.random() * 4);
+                x = tetraVertices[idx][0] * scale * (0.7 + Math.random() * 0.3);
+                y = tetraVertices[idx][1] * scale * (0.7 + Math.random() * 0.3);
+                z = tetraVertices[idx][2] * scale * (0.7 + Math.random() * 0.3);
+                break;
+                
+            case 'octahedron':
+                const octaVertices = [[1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]];
+                const idx2 = Math.floor(Math.random() * 6);
+                x = octaVertices[idx2][0] * scale * (0.8 + Math.random() * 0.2);
+                y = octaVertices[idx2][1] * scale * (0.8 + Math.random() * 0.2);
+                z = octaVertices[idx2][2] * scale * (0.8 + Math.random() * 0.2);
+                break;
+                
+            case 'icosahedron':
+                const goldenRatio = (1 + Math.sqrt(5)) / 2;
+                const icoVertices = [
+                    [0,1,goldenRatio],[0,1,-goldenRatio],[0,-1,goldenRatio],[0,-1,-goldenRatio],
+                    [1,goldenRatio,0],[1,-goldenRatio,0],[-1,goldenRatio,0],[-1,-goldenRatio,0],
+                    [goldenRatio,0,1],[goldenRatio,0,-1],[-goldenRatio,0,1],[-goldenRatio,0,-1]
+                ];
+                const idx3 = Math.floor(Math.random() * 12);
+                const v = icoVertices[idx3];
+                const norm = Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
+                x = (v[0]/norm) * scale * (0.9 + Math.random() * 0.1);
+                y = (v[1]/norm) * scale * (0.9 + Math.random() * 0.1);
+                z = (v[2]/norm) * scale * (0.9 + Math.random() * 0.1);
+                break;
+                
+            case 'dodecahedron':
+                // Simplified dodecahedron vertices
+                const phi = (1 + Math.sqrt(5)) / 2;
+                const dodecaVertices = [
+                    [1,1,1], [1,1,-1], [1,-1,1], [1,-1,-1],
+                    [-1,1,1], [-1,1,-1], [-1,-1,1], [-1,-1,-1],
+                    [0,1/phi,phi], [0,1/phi,-phi], [0,-1/phi,phi], [0,-1/phi,-phi],
+                    [1/phi,phi,0], [1/phi,-phi,0], [-1/phi,phi,0], [-1/phi,-phi,0],
+                    [phi,0,1/phi], [phi,0,-1/phi], [-phi,0,1/phi], [-phi,0,-1/phi]
+                ];
+                const idx4 = Math.floor(Math.random() * 20);
+                const v4 = dodecaVertices[idx4];
+                const norm4 = Math.sqrt(v4[0]*v4[0]+v4[1]*v4[1]+v4[2]*v4[2]);
+                x = (v4[0]/norm4) * scale * (0.85 + Math.random() * 0.15);
+                y = (v4[1]/norm4) * scale * (0.85 + Math.random() * 0.15);
+                z = (v4[2]/norm4) * scale * (0.85 + Math.random() * 0.15);
+                break;
+                
+            case 'star':
+                const outerRadius = 1.0 * scale;
+                const innerRadius = 0.4 * scale;
+                const angle3 = Math.random() * Math.PI * 2;
+                const point = Math.floor(Math.random() * 10);
+                const radius3 = (point % 2 === 0) ? outerRadius : innerRadius;
+                x = radius3 * Math.cos(angle3) * scale;
+                y = radius3 * Math.sin(angle3) * scale;
+                z = (Math.random() - 0.5) * 0.2 * scale;
+                break;
+                
+            case 'heart':
+                const t3 = Math.random() * Math.PI * 2;
+                x = 16 * Math.pow(Math.sin(t3), 3) * scale * 0.08;
+                y = (13 * Math.cos(t3) - 5 * Math.cos(2*t3) - 2 * Math.cos(3*t3) - Math.cos(4*t3)) * scale * 0.08;
+                z = (Math.random() - 0.5) * 0.3 * scale;
+                break;
+                
+            case 'spiral':
+                const spiralT = Math.random() * Math.PI * 10;
+                const spiralR = spiralT * 0.1 * scale;
+                x = spiralR * Math.cos(spiralT) * scale;
+                y = spiralR * Math.sin(spiralT) * scale;
+                z = spiralT * 0.05 * scale;
+                break;
+                
+            case 'helix':
+                const helixT = Math.random() * Math.PI * 10;
+                x = Math.cos(helixT) * scale;
+                y = helixT * 0.1 * scale;
+                z = Math.sin(helixT) * scale;
+                break;
+                
+            case 'wave':
+                x = (Math.random() - 0.5) * 4 * scale;
+                y = Math.sin(x * 2) * 0.5 * scale;
+                z = (Math.random() - 0.5) * 0.5 * scale;
+                break;
+                
+            case 'fractal':
+                let fx = 0, fy = 0, fz = 0;
+                for (let iter = 0; iter < 5; iter++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = Math.pow(Math.random(), 2) * 2;
+                    fx += Math.cos(angle) * dist;
+                    fy += Math.sin(angle) * dist;
+                    fz += (Math.random() - 0.5) * dist * 0.3;
+                }
+                x = fx * scale * 0.15;
+                y = fy * scale * 0.15;
+                z = fz * scale * 0.15;
+                break;
+                
+            default:
+                x = (Math.random() - 0.5) * 2 * scale;
+                y = (Math.random() - 0.5) * 2 * scale;
+                z = (Math.random() - 0.5) * 2 * scale;
+        }
+        
+        return { x, y, z };
+    }
+    
+    // Générer les particules
+    const seed = Date.now() + shapeCounter;
+    for (let i = 0; i < count; i++) {
+        const pos = getShapePoint(i, shapeType, seed + i);
+        positions[i * 3] = pos.x;
+        positions[i * 3 + 1] = pos.y;
+        positions[i * 3 + 2] = pos.z;
+        
+        const colorIndex = Math.floor(Math.random() * colorCount);
+        const color = new THREE.Color(palette[colorIndex]);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+        
+        sizes[i] = 0.02 + Math.random() * 0.06;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    return geometry;
+}
+
+function lerpGeometries(geom1, geom2, progress, targetCount) {
+    const positions1 = geom1.attributes.position.array;
+    const positions2 = geom2.attributes.position.array;
+    const colors1 = geom1.attributes.color.array;
+    const colors2 = geom2.attributes.color.array;
+    const sizes1 = geom1.attributes.size.array;
+    const sizes2 = geom2.attributes.size.array;
+    
+    const count = Math.min(positions1.length / 3, positions2.length / 3, targetCount);
+    const newPositions = new Float32Array(count * 3);
+    const newColors = new Float32Array(count * 3);
+    const newSizes = new Float32Array(count);
+    
+    for (let i = 0; i < count; i++) {
+        const idx = i * 3;
+        const p1x = positions1[idx];
+        const p1y = positions1[idx + 1];
+        const p1z = positions1[idx + 2];
+        const p2x = positions2[idx % positions2.length];
+        const p2y = positions2[(idx + 1) % positions2.length];
+        const p2z = positions2[(idx + 2) % positions2.length];
+        
+        newPositions[idx] = p1x + (p2x - p1x) * progress;
+        newPositions[idx + 1] = p1y + (p2y - p1y) * progress;
+        newPositions[idx + 2] = p1z + (p2z - p1z) * progress;
+        
+        newColors[idx] = colors1[idx] + (colors2[idx % colors2.length] - colors1[idx]) * progress;
+        newColors[idx + 1] = colors1[idx + 1] + (colors2[(idx + 1) % colors2.length] - colors1[idx + 1]) * progress;
+        newColors[idx + 2] = colors1[idx + 2] + (colors2[(idx + 2) % colors2.length] - colors1[idx + 2]) * progress;
+        
+        newSizes[i] = sizes1[i % sizes1.length] + (sizes2[i % sizes2.length] - sizes1[i % sizes1.length]) * progress;
+    }
+    
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(newPositions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(newColors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(newSizes, 1));
+    
+    return geometry;
+}
+
+function startMorph() {
+    isMorphing = true;
+    morphProgress = 0;
+    morphStartTime = Date.now();
+    
+    window.targetGeometry = createShapeGeometry(SHAPES[nextShapeIndex], window.particleCount);
+}
+
+function nextRandomShape() {
+    let newIndex;
+    do {
+        newIndex = Math.floor(Math.random() * SHAPES.length);
+    } while (newIndex === currentShapeIndex && SHAPES.length > 1);
+    return newIndex;
+}
+
+function updateInfoPanel() {
+    document.getElementById('shape-name').textContent = SHAPES[currentShapeIndex].charAt(0).toUpperCase() + 
+        SHAPES[currentShapeIndex].slice(1);
+    document.getElementById('shape-index').textContent = shapeCounter;
+}
+
+function initControls() {
+    document.getElementById('btn-prev').addEventListener('click', () => {
+        nextShapeIndex = (currentShapeIndex - 1 + SHAPES.length) % SHAPES.length;
+        startMorph();
+    });
+    
+    document.getElementById('btn-next').addEventListener('click', () => {
+        nextShapeIndex = (currentShapeIndex + 1) % SHAPES.length;
+        startMorph();
+    });
+    
+    document.getElementById('btn-pause').addEventListener('click', () => {
+        isPaused = !isPaused;
+        document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
+    });
+    
+    document.getElementById('btn-random').addEventListener('click', () => {
+        nextShapeIndex = nextRandomShape();
+        startMorph();
+    });
+    
+    document.getElementById('btn-palette').addEventListener('click', () => {
+        paletteIndex = (paletteIndex + 1) % PALETTES.length;
+        // Recréer les particules avec la nouvelle palette
+        particles.geometry.dispose();
+        particles.geometry = createShapeGeometry(SHAPES[currentShapeIndex], window.particleCount);
+        window.currentGeometry = particles.geometry;
+        if (isMorphing) {
+            window.targetGeometry = createShapeGeometry(SHAPES[nextShapeIndex], window.particleCount);
+        }
+    });
+    
+    // Clavier
+    document.addEventListener('keydown', (e) => {
+        if (e.key === ' ' || e.key === 'Spacebar') {
+            nextShapeIndex = nextRandomShape();
+            startMorph();
+        } else if (e.key === 'ArrowLeft') {
+            nextShapeIndex = (currentShapeIndex - 1 + SHAPES.length) % SHAPES.length;
+            startMorph();
+        } else if (e.key === 'ArrowRight') {
+            nextShapeIndex = (currentShapeIndex + 1) % SHAPES.length;
+            startMorph();
+        } else if (e.key === 'p' || e.key === 'P') {
+            isPaused = !isPaused;
+            document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
+        } else if (e.key === 'c' || e.key === 'C') {
+            paletteIndex = (paletteIndex + 1) % PALETTES.length;
+            particles.geometry.dispose();
+            particles.geometry = createShapeGeometry(SHAPES[currentShapeIndex], window.particleCount);
+            window.currentGeometry = particles.geometry;
+            if (isMorphing) {
+                window.targetGeometry = createShapeGeometry(SHAPES[nextShapeIndex], window.particleCount);
+            }
+        }
+    });
+    
+    // Clic sur le canvas
+    renderer.domElement.addEventListener('click', () => {
+        nextShapeIndex = nextRandomShape();
+        startMorph();
+    });
+}
+
+let morphStartTime = 0;
+let frameCount = 0;
+let lastFpsTime = 0;
+
+function animate() {
+    requestAnimationFrame(animate);
+    
+    if (!isPaused) {
+        const now = Date.now();
+        const delta = (now - (window.lastTime || now)) / 1000;
+        window.lastTime = now;
+        
+        // Rotation
+        if (particles) {
+            particles.rotation.y += CONFIG.rotationSpeed * delta;
+        }
+        
+        // Morphing automatique
+        if (!isMorphing) {
+            const elapsed = (now - morphStartTime) / 1000;
+            if (elapsed > CONFIG.morphDuration) {
+                nextShapeIndex = nextRandomShape();
+                startMorph();
+            }
+        }
+        
+        // Animation de morphing
+        if (isMorphing) {
+            const elapsed = (now - morphStartTime) / 1000;
+            morphProgress = Math.min(1.0, elapsed / CONFIG.transitionDuration);
+            
+            const morphedGeometry = lerpGeometries(
+                window.currentGeometry,
+                window.targetGeometry,
+                morphProgress,
+                window.particleCount
+            );
+            
+            particles.geometry.dispose();
+            particles.geometry = morphedGeometry;
+            
+            document.getElementById('morph-progress-text').textContent = Math.round(morphProgress * 100) + '%';
+            
+            if (morphProgress >= 1.0) {
+                isMorphing = false;
+                currentShapeIndex = nextShapeIndex;
+                window.currentGeometry = window.targetGeometry;
+                shapeCounter++;
+                updateInfoPanel();
+                morphStartTime = now;
+            }
+        }
+        
+        controls.update();
+    }
+    
+    // FPS counter
+    frameCount++;
+    if (now - lastFpsTime >= 1000) {
+        document.getElementById('fps-counter').textContent = frameCount + ' FPS';
+        frameCount = 0;
+        lastFpsTime = now;
+    }
+    
+    renderer.render(scene, camera);
+}
+
+// Démarrer l'initialisation
+init();
     </script>
 </body>
 </html>
