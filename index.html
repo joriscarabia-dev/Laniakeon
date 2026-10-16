@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Continuous Morphing Silhouettes 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            background-color: #030408;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        .absolute { display: none !important; }
+        #brightness-panel {
+            display: none; position: fixed; z-index: 20; left: 50%; bottom: 22px; transform: translateX(-50%);
+            width: min(340px, calc(100vw - 32px)); padding: 14px 16px; color: #f3f4f6;
+            background: rgba(10, 14, 26, 0.88); border: 1px solid rgba(255,255,255,.16);
+            border-radius: 14px; font: 13px system-ui, sans-serif; backdrop-filter: blur(12px);
+        }
+        #brightness-panel.visible { display: block; }
+        #self-model-panel {
+            display: none; position: fixed; z-index: 21; top: 16px; right: 16px;
+            width: min(320px, calc(100vw - 32px)); padding: 15px 17px; color: #e9f5ff;
+            background: rgba(5, 11, 24, .88); border: 1px solid rgba(120, 190, 255, .24);
+            border-radius: 16px; font: 13px/1.45 system-ui, sans-serif; backdrop-filter: blur(14px);
+            box-shadow: 0 12px 40px rgba(0,0,0,.35);
+        }
+        #self-model-panel.visible { display: block; }
+        #self-model-panel h2 { color: #91caff; font-size: 13px; margin-bottom: 5px; }
+        #self-model-panel p { color: #aab9ca; font-size: 11px; margin-bottom: 10px; }
+        #self-model-panel .model-row { display: flex; justify-content: space-between; gap: 14px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,.07); }
+        #self-model-panel strong { color: #f4fbff; font-variant-numeric: tabular-nums; }
+        #mobile-controls { display: none; }
+        #mobile-controls button {
+            width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.18); border-radius: 15px;
+            color: #eafaff; background: rgba(12, 24, 44, .82); font: 20px system-ui, sans-serif;
+            touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+        }
+        #mobile-controls button:active { background: rgba(23, 105, 255, .68); transform: scale(.96); }
+        @media (max-width: 800px), (pointer: coarse) {
+            #mobile-controls {
+                display: flex; position: fixed; z-index: 20; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom));
+                transform: translateX(-50%); gap: 10px; padding: 7px; border: 1px solid rgba(255,255,255,.1);
+                border-radius: 20px; background: rgba(3, 8, 18, .58); backdrop-filter: blur(10px);
+            }
+            #brightness-panel { bottom: calc(78px + env(safe-area-inset-bottom)); }
+        }
+        #brightness-slider { width: 100%; margin-top: 10px; accent-color: #a78bfa; touch-action: auto; }
+        .glass-panel {
+            background: rgba(10, 14, 26, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="brightness-panel" role="group" aria-label="Réglage de luminosité">
+        <label for="brightness-slider">Luminosité des pixels <span id="brightness-value">35 %</span></label>
+        <input id="brightness-slider" type="range" min="0" max="1" step="0.01" value="0.35" aria-label="Luminosité des pixels">
+        <div style="margin-top:6px;color:#9ca3af;font-size:11px">B sur PC ou le bouton soleil sur mobile pour fermer.</div>
+    </div>
+    
+    <div id="mobile-controls" role="group" aria-label="Commandes de la simulation">
+        <button id="mobile-pause" type="button" aria-label="Mettre en pause" aria-pressed="false" title="Pause / reprendre">Ⅱ</button>
+        <button id="mobile-palette" type="button" aria-label="Changer de couleur" title="Changer de couleur">◉</button>
+        <button id="mobile-brightness" type="button" aria-label="Régler la luminosité" title="Régler la luminosité">☼</button>
+        <button id="mobile-model" type="button" aria-label="Afficher l'auto-observation" aria-pressed="false" title="Auto-observation">◎</button>
+    </div>
+    
+    <section id="self-model-panel" role="status" aria-live="polite" aria-hidden="true" aria-label="Auto-observation de la simulation">
+        <h2>Auto-observation du système</h2>
+        <p>La figure évolue à chaque image ; mémoire et comparaison s'actualisent à chaque nouvelle composition. Raccourci : M sur PC, bouton ◎ sur mobile.</p>
+        <div class="model-row">
+            <span>Formes observées</span>
+            <strong id="model-count">0</strong>
+        </div>
+        <div class="model-row">
+            <span>Écart à la mémoire récente</span>
+            <strong id="model-novelty">—</strong>
+        </div>
+        <div class="model-row">
+            <span>Familles de motifs utilisées</span>
+            <strong id="model-motifs">—</strong>
+        </div>
+        <div class="model-row">
+            <span>Composants de la forme</span>
+            <strong id="model-components">—</strong>
+        </div>
+    </section>
+
+    <!-- HUD Overlay -->
+    <div class="absolute top-4 left-4 z-10 pointer-events-none flex flex-col gap-2">
+        <div class="glass-panel text-white p-4 rounded-xl shadow-2xl max-w-xs pointer-events-auto transition-all duration-300">
+            <div class="flex items-center justify-between mb-2">
+                <h1 class="text-sm font-semibold tracking-wider text-indigo-300 uppercase flex items-center gap-2">
+                    <i class="fa-solid fa-sync fa-spin text-indigo-400"></i> Morphing Loop
+                </h1>
+                <span id="cycle-badge" class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Phase 1</span>
+            </div>
+            <p id="shape-title" class="text-lg font-bold text-white tracking-wide">Humanoid Figure</p>
+            <p id="shape-desc" class="text-xs text-gray-400 mt-1 leading-relaxed">
+                Standing figure with outstretched posture rotating continuously on its axis.
+            </p>
+            <div class="w-full bg-gray-800/80 rounded-full h-1.5 mt-3 overflow-hidden border border-white/5">
+                <div id="morph-progress" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-1.5 rounded-full w-0 transition-all duration-100"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+                <span>Rotation Cycle</span>
+                <span id="angle-text">0°</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Controls Overlay -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-auto flex items-center gap-3 glass-panel px-5 py-3 rounded-2xl shadow-2xl">
+        <button id="btn-prev" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
+            <i class="fa-solid fa-backward-step"></i>
+        </button>
+        <button id="btn-pause" class="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition shadow-lg shadow-indigo-600/30 hover:scale-105 active:scale-95">
+            <i id="pause-icon" class="fa-solid fa-pause"></i>
+        </button>
+        <button id="btn-next" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
+            <i class="fa-solid fa-forward-step"></i>
+        </button>
+        <div class="h-6 w-px bg-white/10 mx-1"></div>
+        <button id="btn-burst" class="px-4 h-10 rounded-xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 hover:from-pink-500/30 hover:to-purple-500/30 text-pink-300 hover:text-white flex items-center gap-2 text-xs font-medium transition border border-pink-500/30 hover:scale-105 active:scale-95">
+            <i class="fa-solid fa-wand-magic-sparkles text-pink-400"></i> Pulse Shockwave
+        </button>
+        <button id="btn-palette" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95" title="Switch Color Palette">
+            <i class="fa-solid fa-palette text-amber-400"></i>
+        </button>
+    </div>
+
+    <!-- Instructions Helper -->
+    <div class="absolute bottom-6 right-6 z-10 pointer-events-none hidden md:block">
+        <div class="glass-panel px-3 py-2 rounded-lg text-[11px] text-gray-400 flex items-center gap-3">
+            <span><i class="fa-solid fa-mouse text-indigo-400 mr-1"></i> Drag to rotate scene</span>
+            <span><i class="fa-solid fa-hand-pointer text-indigo-400 mr-1"></i> Click canvas to blast</span>
+        </div>
+    </div>
+
+    <script>
+        // Tu peux remplacer tout ce code par le tien
+        console.log("Simulation 3D - Prête à être personnalisée");
+        
+        // Configuration de base
+        const CONFIG = {
+            particleCount: 150000,
+            spinSpeed: 0.45,
+            morphDuration: 15,
+            dispersionFactor: 1.2,
+            words: [],
+            phrases: []
+        };
+        
+        // Initialisation Three.js
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030408, 0.008);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 8, 45);
+        camera.updateProjectionMatrix();
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+        container.appendChild(renderer.domElement);
+        
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.04;
+        controls.maxDistance = 120;
+        controls.minDistance = 10;
+        controls.maxPolarAngle = Math.PI / 2 + 0.15;
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        // Gestion du redimensionnement
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
