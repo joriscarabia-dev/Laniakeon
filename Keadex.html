@@ -1,421 +1,990 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Keadex - Morphing 3D</title>
+    <title>Continuous Morphing Silhouettes 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body {
-            width: 100%; height: 100%; height: 100dvh;
-            overflow: hidden; background: #000;
-            user-select: none; -webkit-user-select: none;
-            touch-action: none; font-family: system-ui, sans-serif;
-        }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
-        #debug {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: #fff; font-size: 16px; z-index: 1000;
-            background: rgba(0,0,0,0.95); padding: 20px; border-radius: 10px;
-            text-align: center; max-width: 80%;
-        }
-        #info {
-            position: fixed; top: 16px; left: 16px; z-index: 100;
-            color: #fff; background: rgba(0,0,0,0.7);
-            border-radius: 12px; padding: 12px 16px;
-            font: 12px system-ui, sans-serif; backdrop-filter: blur(10px);
-            display: none;
-        }
-        #controls {
-            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 100; display: flex; gap: 10px; flex-wrap: wrap;
-            justify-content: center; padding: 10px;
-            background: rgba(0,0,0,0.5); border-radius: 15px; backdrop-filter: blur(10px);
-            display: none;
-        }
-        #controls button {
-            width: 44px; height: 44px; border: none; border-radius: 12px;
-            background: rgba(255,255,255,0.1); color: white;
-            font-size: 18px; cursor: pointer; transition: all 0.2s;
-        }
-        #controls button:hover { background: rgba(255,255,255,0.2); }
-        #controls button:active { transform: scale(0.95); }
-        .hidden { display: none !important; }
-    </style>
-</head>
-<body>
-    <div id="debug">
-        <div>Keadex - Initialisation en cours...</div>
-        <div id="debug-step">Étape 1: Chargement de Three.js...</div>
-        <div id="debug-error" style="color:#ff4444;margin-top:10px;"></div>
-    </div>
-    
-    <div id="canvas-container"></div>
-    
-    <div id="info">
-        <div id="shape-name" style="font-weight:600;color:#8b5cf6">Keadex</div>
-        <div style="color:#aaa;font-size:11px">
-            <span id="shape-index">0</span> | <span id="fps">0 FPS</span>
-        </div>
-    </div>
-    
-    <div id="controls">
-        <button id="btn-prev" title="Précédent">←</button>
-        <button id="btn-pause" title="Pause">⏸</button>
-        <button id="btn-next" title="Suivant">→</button>
-        <button id="btn-random" title="Aléatoire">🎲</button>
-        <button id="btn-palette" title="Couleurs">🎨</button>
-    </div>
-
-    <!-- Charger Three.js EN PREMIER - ces scripts bloquent l'exécution -->
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: #030408;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    /* L'animation reste seule à l'écran, sans HUD ni commandes. */
+    .absolute { display: none !important; }
+    #brightness-panel {
+      display: none; position: fixed; z-index: 20; left: 50%; bottom: 22px; transform: translateX(-50%);
+      width: min(340px, calc(100vw - 32px)); padding: 14px 16px; color: #f3f4f6;
+      background: rgba(10, 14, 26, 0.88); border: 1px solid rgba(255,255,255,.16);
+      border-radius: 14px; font: 13px system-ui, sans-serif; backdrop-filter: blur(12px);
+    }
+    #brightness-panel.visible { display: block; }
+    #self-model-panel {
+      display: none; position: fixed; z-index: 21; top: 16px; right: 16px;
+      width: min(320px, calc(100vw - 32px)); padding: 15px 17px; color: #e9f5ff;
+      background: rgba(5, 11, 24, .88); border: 1px solid rgba(120, 190, 255, .24);
+      border-radius: 16px; font: 13px/1.45 system-ui, sans-serif; backdrop-filter: blur(14px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    }
+    #self-model-panel.visible { display: block; }
+    #self-model-panel h2 { color: #91caff; font-size: 13px; margin-bottom: 5px; }
+    #self-model-panel p { color: #aab9ca; font-size: 11px; margin-bottom: 10px; }
+    #self-model-panel .model-row { display: flex; justify-content: space-between; gap: 14px; padding: 4px 0; border-top: 1px solid rgba(255,255,255,.07); }
+    #self-model-panel strong { color: #f4fbff; font-variant-numeric: tabular-nums; }
+    #mobile-controls { display: none; }
+    #mobile-controls button {
+      width: 48px; height: 48px; border: 1px solid rgba(255,255,255,.18); border-radius: 15px;
+      color: #eafaff; background: rgba(12, 24, 44, .82); font: 20px system-ui, sans-serif;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    #mobile-controls button:active { background: rgba(23, 105, 255, .68); transform: scale(.96); }
+    @media (max-width: 800px), (pointer: coarse) {
+      #mobile-controls {
+        display: flex; position: fixed; z-index: 20; left: 50%; bottom: calc(12px + env(safe-area-inset-bottom));
+        transform: translateX(-50%); gap: 10px; padding: 7px; border: 1px solid rgba(255,255,255,.1);
+        border-radius: 20px; background: rgba(3, 8, 18, .58); backdrop-filter: blur(10px);
+      }
+      #brightness-panel { bottom: calc(78px + env(safe-area-inset-bottom)); }
+    }
+    #brightness-slider { width: 100%; margin-top: 10px; accent-color: #a78bfa; touch-action: auto; }
+    /* Custom UI overlay backdrop blur */
+    .glass-panel {
+      background: rgba(10, 14, 26, 0.65);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    
-    <!-- Vérifier que Three.js est chargé -->
-    <script>
-        if (typeof THREE === 'undefined') {
-            document.getElementById('debug-step').textContent = 'ERREUR: Three.js non chargé depuis CDN';
-            document.getElementById('debug-error').textContent = 'Vérifiez votre connexion internet ou désactivez les bloquers de scripts.';
-            throw new Error('Three.js not loaded');
-        }
-        document.getElementById('debug-step').textContent = 'Étape 2: Chargement de OrbitControls...';
-    </script>
-    
-    <!-- Charger OrbitControls -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    
-    <!-- Vérifier OrbitControls -->
-    <script>
-        if (typeof THREE.OrbitControls === 'undefined') {
-            document.getElementById('debug-step').textContent = 'ERREUR: OrbitControls non chargé';
-            document.getElementById('debug-error').textContent = 'Problème avec le CDN jsdelivr.net';
-            throw new Error('OrbitControls not loaded');
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+  </head>
+  <body>
+    <div id="canvas-container">
+    </div>
+    <div id="brightness-panel" role="group" aria-label="Réglage de luminosité">
+      <label for="brightness-slider">Luminosité des pixels <span id="brightness-value">35 %</span>
+    </label>
+    <input id="brightness-slider" type="range" min="0" max="1" step="0.01" value="0.35" aria-label="Luminosité des pixels">
+    <div style="margin-top:6px;color:#9ca3af;font-size:11px">B sur PC ou le bouton soleil sur mobile pour fermer.</div>
+  </div>
+  <div id="mobile-controls" role="group" aria-label="Commandes de la simulation">
+    <button id="mobile-pause" type="button" aria-label="Mettre en pause" aria-pressed="false" title="Pause / reprendre">Ⅱ</button>
+    <button id="mobile-palette" type="button" aria-label="Changer de couleur" title="Changer de couleur">◉</button>
+    <button id="mobile-brightness" type="button" aria-label="Régler la luminosité" title="Régler la luminosité">☼</button>
+    <button id="mobile-model" type="button" aria-label="Afficher l’auto-observation" aria-pressed="false" title="Auto-observation">◎</button>
+  </div>
+  <section id="self-model-panel" role="status" aria-live="polite" aria-hidden="true" aria-label="Auto-observation de la simulation">
+    <h2>Auto-observation du système</h2>
+    <p>La figure évolue à chaque image ; mémoire et comparaison s’actualisent à chaque nouvelle composition. Raccourci : M sur PC, bouton ◎ sur mobile.</p>
+    <div class="model-row">
+      <span>Formes observées</span>
+      <strong id="model-count">0</strong>
+    </div>
+    <div class="model-row">
+      <span>Écart à la mémoire récente</span>
+      <strong id="model-novelty">—</strong>
+    </div>
+    <div class="model-row">
+      <span>Familles de motifs utilisées</span>
+      <strong id="model-motifs">—</strong>
+    </div>
+    <div class="model-row">
+      <span>Composants de la forme</span>
+      <strong id="model-components">—</strong>
+    </div>
+  </section>
+  <!-- HUD Overlay -->
+  <div class="absolute top-4 left-4 z-10 pointer-events-none flex flex-col gap-2">
+    <div class="glass-panel text-white p-4 rounded-xl shadow-2xl max-w-xs pointer-events-auto transition-all duration-300">
+      <div class="flex items-center justify-between mb-2">
+        <h1 class="text-sm font-semibold tracking-wider text-indigo-300 uppercase flex items-center gap-2">
+          <i class="fa-solid fa-sync fa-spin text-indigo-400">
+          </i> Morphing Loop
+        </h1>
+        <span id="cycle-badge" class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Phase 1</span>
+      </div>
+      <p id="shape-title" class="text-lg font-bold text-white tracking-wide">Humanoid Figure</p>
+      <p id="shape-desc" class="text-xs text-gray-400 mt-1 leading-relaxed">
+        Standing figure with outstretched posture rotating continuously on its axis.
+      </p>
+      <!-- Progress Bar for Current Morph Loop -->
+      <div class="w-full bg-gray-800/80 rounded-full h-1.5 mt-3 overflow-hidden border border-white/5">
+        <div id="morph-progress" class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 h-1.5 rounded-full w-0 transition-all duration-100">
+        </div>
+      </div>
+      <div class="flex justify-between text-[10px] text-gray-500 mt-1">
+        <span>Rotation Cycle</span>
+        <span id="angle-text">0°</span>
+      </div>
+    </div>
+  </div>
+  <!-- Interactive Controls Overlay -->
+  <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 pointer-events-auto flex items-center gap-3 glass-panel px-5 py-3 rounded-2xl shadow-2xl">
+    <button id="btn-prev" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
+      <i class="fa-solid fa-backward-step">
+      </i>
+    </button>
+    <button id="btn-pause" class="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center transition shadow-lg shadow-indigo-600/30 hover:scale-105 active:scale-95">
+      <i id="pause-icon" class="fa-solid fa-pause">
+      </i>
+    </button>
+    <button id="btn-next" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95">
+      <i class="fa-solid fa-forward-step">
+      </i>
+    </button>
+    <div class="h-6 w-px bg-white/10 mx-1">
+    </div>
+    <button id="btn-burst" class="px-4 h-10 rounded-xl bg-gradient-to-r from-pink-500/20 to-purple-500/20 hover:from-pink-500/30 hover:to-purple-500/30 text-pink-300 hover:text-white flex items-center gap-2 text-xs font-medium transition border border-pink-500/30 hover:scale-105 active:scale-95">
+      <i class="fa-solid fa-wand-magic-sparkles text-pink-400">
+      </i> Pulse Shockwave
+    </button>
+    <button id="btn-palette" class="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/15 text-white flex items-center justify-center transition border border-white/10 hover:scale-105 active:scale-95" title="Switch Color Palette">
+      <i class="fa-solid fa-palette text-amber-400">
+      </i>
+    </button>
+  </div>
+  <!-- Instructions Helper -->
+  <div class="absolute bottom-6 right-6 z-10 pointer-events-none hidden md:block">
+    <div class="glass-panel px-3 py-2 rounded-lg text-[11px] text-gray-400 flex items-center gap-3">
+      <span>
+        <i class="fa-solid fa-mouse text-indigo-400 mr-1">
+        </i> Drag to rotate scene</span>
+        <span>
+          <i class="fa-solid fa-hand-pointer text-indigo-400 mr-1">
+          </i> Click canvas to blast</span>
+        </div>
+      </div>
+      <script>
+    // --- Simplex Noise 3D Implementation ---
+    const SimplexNoise = function() {
+      const F3 = 1.0 / 3.0, G3 = 1.0 / 6.0;
+      const p = new Uint8Array(256);
+      for (let i = 0; i < 256; i++) p[i] = Math.floor(Math.random() * 256);
+      const perm = new Uint8Array(512), permMod12 = new Uint8Array(512);
+      for (let i = 0; i < 512; i++) {
+        perm[i] = p[i & 255];
+        permMod12[i] = (perm[i] % 12);
+      }
+      return {
+        noise3D: function(xin, yin, zin) {
+          let n0, n1, n2, n3;
+          const s = (xin + yin + zin) * F3;
+          const i = Math.floor(xin + s), j = Math.floor(yin + s), k = Math.floor(zin + s);
+          const t = (i + j + k) * G3;
+          const X0 = i - t, Y0 = j - t, Z0 = k - t;
+          const x0 = xin - X0, y0 = yin - Y0, z0 = zin - Z0;
+          let i1, j1, k1, i2, j2, k2;
+          if (x0 >= y0) {
+            if (y0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=1; k2=0; }
+            else if (x0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=0; k2=1; }
+            else { i1=0; j1=0; k1=1; i2=1; j2=0; k2=1; }
+          } else {
+            if (y0 < z0) { i1=0; j1=0; k1=1; i2=0; j2=1; k2=1; }
+            else if (x0 < z0) { i1=0; j1=1; k1=0; i2=0; j2=1; k2=1; }
+            else { i1=0; j1=1; k1=0; i2=1; j2=1; k2=0; }
+          }
+          const x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+          const x2 = x0 - i2 + 2.0*G3, y2 = y0 - j2 + 2.0*G3, z2 = z0 - k2 + 2.0*G3;
+          const x3 = x0 - 1.0 + 3.0*G3, y3 = y0 - 1.0 + 3.0*G3, z3 = z0 - 1.0 + 3.0*G3;
+          const ii = i & 255, jj = j & 255, kk = k & 255;
+          const gi0 = permMod12[ii+perm[jj+perm[kk]]];
+          const gi1 = permMod12[ii+i1+perm[jj+j1+perm[kk+k1]]];
+          const gi2 = permMod12[ii+i2+perm[jj+j2+perm[kk+k2]]];
+          const gi3 = permMod12[ii+1+perm[jj+1+perm[kk+1]]];
+          let t0 = 0.6 - x0*x0 - y0*y0 - z0*z0; if (t0<0) n0 = 0.0; else { t0 *= t0; n0 = t0 * t0 * (gi0%2===0?1:-1)*(x0 + y0); }
+          let t1 = 0.6 - x1*x1 - y1*y1 - z1*z1; if (t1<0) n1 = 0.0; else { t1 *= t1; n1 = t1 * t1 * (gi1%2===0?1:-1)*(x1 + y1); }
+          let t2 = 0.6 - x2*x2 - y2*y2 - z2*z2; if (t2<0) n2 = 0.0; else { t2 *= t2; n2 = t2 * t2 * (gi2%2===0?1:-1)*(x2 + y2); }
+          let t3 = 0.6 - x3*x3 - y3*y3 - z3*z3; if (t3<0) n3 = 0.0; else { t3 *= t3; n3 = t3 * t3 * (gi3%2===0?1:-1)*(x3 + y3); }
+          return 32.0 * (n0 + n1 + n2 + n3);
         }
-        document.getElementById('debug-step').textContent = 'Étape 3: Initialisation de la scène...';
-    </script>
+      };
+    };
+    const simplex = SimplexNoise();
 
-    <!-- MAIN CODE - S'exécute UNIQUEMENT si Three.js et OrbitControls sont chargés -->
-    <script>
-// ============================================
-// KEADEX - Version garantie
-// ============================================
+    const compactDevice = window.matchMedia('(max-width: 800px)').matches || (navigator.maxTouchPoints || 0) > 0;
+    const lowPowerDevice = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+    const CONFIG = {
+      particleCount: lowPowerDevice ? 90000 : (compactDevice ? 150000 : 250000),
+      spinSpeed: 0.45, // Rotation speed around Y axis
+      morphDuration: 15, // Seconds per full 360 morph stage
+      dispersionFactor: 1.2,
+      // Ajoute ici tes propres mots et phrases ; vide = aucune forme texte.
+      words: [],
+      phrases: []
+    };
 
-// Configuration
-const CFG = {
-    particles: 40000,
-    rotationSpeed: 0.1,
-    morphDuration: 5000,
-    transitionDuration: 2000,
-    fogDensity: 0.003
-};
+    // Prototype d’auto-observation : une mémoire courte de recettes structurelles,
+    // utilisée pour comparer les formes et favoriser les motifs encore peu explorés.
+    const MOTIF_KIND_COUNT = 21;
+    const FEATURE_LENGTH = 36;
+    const SELF_MODEL = { memory: [], memoryLimit: 24, observed: 0, lastNovelty: 1, recentNovelty: 1, lastMotifCount: 0, lastComponentCount: 0 };
 
-// Formes
-const SHAPES = ['box','sphere','torus','cone','cylinder','tetrahedron','octahedron','icosahedron','star','heart','spiral','helix'];
-
-// Palettes
-const PALETTES = [
-    [0x8b5cf6,0x06b6d4,0x3b82f6,0xec4899],
-    [0xef4444,0xf59e0b,0x22c55e,0x06b6d4],
-    [0x06b6d4,0x22c55e,0xa855f7,0xec4899]
-];
-
-// État
-let scene, camera, renderer, controls, particles;
-let currentShape = 'sphere';
-let nextShape = 'box';
-let isMorphing = false;
-let morphStart = 0;
-let isPaused = false;
-let paletteIdx = 0;
-let shapeCounter = 0;
-let currentGeometry, targetGeometry;
-
-// ===== INIT =====
-function init() {
-    try {
-        const container = document.getElementById('canvas-container');
-        
-        scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x000000, CFG.fogDensity);
-        scene.background = new THREE.Color(0x000000);
-        
-        camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 0, 25);
-        
-        renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        container.appendChild(renderer.domElement);
-        
-        controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.maxDistance = 80;
-        controls.minDistance = 10;
-        
-        const ambient = new THREE.AmbientLight(0x333366, 0.5);
-        scene.add(ambient);
-        const point = new THREE.PointLight(0xffffff, 0.8, 100);
-        point.position.set(20,20,20);
-        scene.add(point);
-        
-        createParticles();
-        setupControls();
-        
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth/window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-        
-        // Masquer debug, afficher UI
-        document.getElementById('debug').classList.add('hidden');
-        document.getElementById('info').style.display = 'block';
-        document.getElementById('controls').style.display = 'flex';
-        
-        animate();
-        
-    } catch (error) {
-        document.getElementById('debug-step').textContent = 'ERREUR: ' + error.message;
-        document.getElementById('debug-error').textContent = 'Stack: ' + error.stack;
-        document.getElementById('debug').style.background = 'rgba(255,0,0,0.95)';
+    function emptyFeatureVector() { return new Array(FEATURE_LENGTH).fill(0); }
+    function compareFeatures(a, b) {
+      let histogramDistance = 0;
+      for (let i = 0; i < MOTIF_KIND_COUNT; i++) histogramDistance += Math.abs((a[i] || 0) - (b[i] || 0));
+      histogramDistance *= 0.5;
+      let parameterDistance = 0;
+      for (let i = MOTIF_KIND_COUNT; i < FEATURE_LENGTH; i++) parameterDistance += Math.abs((a[i] || 0) - (b[i] || 0));
+      parameterDistance /= FEATURE_LENGTH - MOTIF_KIND_COUNT;
+      return Math.min(1, histogramDistance * 0.72 + parameterDistance * 0.28);
     }
-}
+    function recentNoveltyDrive() {
+      return Math.max(0, Math.min(1, (0.34 - SELF_MODEL.recentNovelty) / 0.34));
+    }
+    function chooseMotifKind() {
+      const usage = new Array(MOTIF_KIND_COUNT).fill(0);
+      const history = SELF_MODEL.memory;
+      for (let i = 0; i < history.length; i++) {
+        const recency = 0.3 + 0.7 * ((i + 1) / Math.max(1, history.length));
+        for (let kind = 0; kind < MOTIF_KIND_COUNT; kind++) usage[kind] += (history[i].features[kind] || 0) * recency;
+      }
+      const weights = usage.map(value => 1 / (0.22 + value));
+      const total = weights.reduce((sum, value) => sum + value, 0);
+      let pick = Math.random() * total;
+      for (let kind = 0; kind < weights.length; kind++) {
+        pick -= weights[kind];
+        if (pick <= 0) return kind;
+      }
+      return Math.floor(Math.random() * MOTIF_KIND_COUNT);
+    }
+    function observeShape(shape) {
+      const features = (shape.features || emptyFeatureVector()).slice(0, FEATURE_LENGTH);
+      while (features.length < FEATURE_LENGTH) features.push(0);
+      const novelty = SELF_MODEL.memory.length
+        ? Math.min(...SELF_MODEL.memory.map(entry => compareFeatures(features, entry.features)))
+        : 1;
+      SELF_MODEL.observed++;
+      SELF_MODEL.lastNovelty = novelty;
+      SELF_MODEL.lastMotifCount = shape.motifCount || 1;
+      SELF_MODEL.lastComponentCount = shape.componentCount || 1;
+      SELF_MODEL.memory.push({ features, novelty });
+      if (SELF_MODEL.memory.length > SELF_MODEL.memoryLimit) SELF_MODEL.memory.shift();
+      const recent = SELF_MODEL.memory.slice(-8);
+      SELF_MODEL.recentNovelty = recent.reduce((sum, entry) => sum + entry.novelty, 0) / recent.length;
+      document.getElementById('model-count').textContent = String(SELF_MODEL.observed);
+      document.getElementById('model-novelty').textContent = `${Math.round(novelty * 100)} %`;
+      document.getElementById('model-motifs').textContent = `${SELF_MODEL.lastMotifCount} / ${MOTIF_KIND_COUNT}`;
+      document.getElementById('model-components').textContent = String(SELF_MODEL.lastComponentCount);
+    }
+    function generateObservedShape() {
+      const hasConfiguredText = [...CONFIG.words, ...CONFIG.phrases].some(value => value.trim());
+      const shape = hasConfiguredText && Math.random() < 0.22 ? generateConfiguredText() : generateProceduralShape();
+      observeShape(shape);
+      return shape;
+    }
 
-// ===== PARTICLES =====
-function createParticles() {
-    const geom = generateShapeGeometry(currentShape, CFG.particles);
-    const mat = new THREE.PointsMaterial({
-        size: 0.04,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.85,
-        sizeAttenuation: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
+    // Color Palettes
+    const PALETTES = [
+      { name: "Deep Blue", primary: "#1769ff", secondary: "#00c8ff", accent: "#72e4ff", core: "#eafaff" },
+      { name: "Solar Flare", primary: "#ff9f1a", secondary: "#ff3838", accent: "#fff200", core: "#ffffff" },
+      { name: "Deep Emerald", primary: "#05c46b", secondary: "#0fbcf9", accent: "#ffd32a", core: "#d2dae2" },
+      { name: "Bio Luminescence", primary: "#ef5777", secondary: "#575fcf", accent: "#4bcffa", core: "#f8a5c2" }
+    ];
+    let currentPaletteIndex = 0;
+
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030408, 0.008);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 8, 45);
+    camera.fov = camera.aspect < 1 ? Math.min(75, 45 / Math.max(camera.aspect, 0.6)) : 45;
+    camera.updateProjectionMatrix();
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    const pixelRatioCap = compactDevice ? 1.5 : 2;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioCap));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.04;
+    controls.maxDistance = 120;
+    controls.minDistance = 10;
+    controls.maxPolarAngle = Math.PI / 2 + 0.15;
+    controls.rotateSpeed = compactDevice ? 0.7 : 1.0;
+    controls.zoomSpeed = compactDevice ? 0.8 : 1.0;
+
+    // Helper to generate 3D procedural shapes matching point count
+    const COUNT = CONFIG.particleCount;
+
+    // Silhouette textuelle basée sur les listes configurées dans CONFIG.
+    function generateConfiguredText() {
+      const choices = [...CONFIG.words, ...CONFIG.phrases].map(value => value.trim()).filter(Boolean);
+      const text = choices.length ? choices[Math.floor(Math.random() * choices.length)] : 'INFINI';
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 1200; canvas.height = 420;
+      let fontSize = 150;
+      do { ctx.font = `900 ${fontSize}px system-ui, sans-serif`; fontSize -= 5; } while (ctx.measureText(text).width > 1120 && fontSize > 35);
+      ctx.font = `900 ${fontSize}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff'; ctx.fillText(text, 600, 210, 1120);
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data, points = [];
+      for (let y = 0; y < canvas.height; y += 3) for (let x = 0; x < canvas.width; x += 3) if (pixels[(y * canvas.width + x) * 4 + 3] > 100) points.push([x, y]);
+      const pos = new Float32Array(COUNT * 3);
+      for (let i = 0; i < COUNT; i++) {
+        const point = points[Math.floor(Math.random() * points.length)] || [600, 210], j = i * 3;
+        pos[j] = (point[0] - 600) * 0.027 + (Math.random() - 0.5) * 0.12;
+        pos[j + 1] = (210 - point[1]) * 0.027 + (Math.random() - 0.5) * 0.12;
+        pos[j + 2] = (Math.random() - 0.5) * 0.8;
+      }
+      const features = emptyFeatureVector();
+      const normalizedText = text.toLocaleLowerCase();
+      for (const char of normalizedText) features[char.codePointAt(0) % MOTIF_KIND_COUNT]++;
+      const charCount = Math.max(1, normalizedText.length);
+      for (let i = 0; i < MOTIF_KIND_COUNT; i++) features[i] /= charCount;
+      features[21] = Math.min(1, text.length / 80);
+      features[22] = Math.min(1, new Set(normalizedText).size / 32);
+      features[23] = Math.min(1, text.trim().split(/\s+/).length / 12);
+      features[24] = Math.min(1, (text.match(/[.,;:!?-]/g) || []).length / 10);
+      return { positions: pos, label: text, desc: 'Silhouette créée à partir d’un texte configuré.', features, componentCount: 1, motifCount: features.slice(0, MOTIF_KIND_COUNT).filter(value => value > 0).length };
+    }
+
+    // Motif initial : double hélice ADN avec barreaux transversaux.
+    function generateDNAMotif() {
+      const pos = new Float32Array(COUNT * 3);
+      const height = 18, radius = 3.4, turns = 9 + Math.random() * 3;
+      for (let i = 0; i < COUNT; i++) {
+        const j = i * 3;
+        if (Math.random() < 0.84) {
+          const progress = Math.random();
+          const strand = Math.random() < 0.5 ? 0 : Math.PI;
+          const angle = progress * turns * Math.PI * 2 + strand;
+          const localRadius = radius + 0.22 * Math.sin(progress * Math.PI * 8);
+          pos[j] = localRadius * Math.cos(angle) + (Math.random() - 0.5) * 0.16;
+          pos[j + 1] = (progress - 0.5) * height + (Math.random() - 0.5) * 0.16;
+          pos[j + 2] = localRadius * Math.sin(angle) + (Math.random() - 0.5) * 0.16;
+        } else {
+          const rung = Math.floor(Math.random() * 24);
+          const progress = rung / 23;
+          const angle = progress * turns * Math.PI * 2;
+          const across = Math.random() * 2 - 1;
+          pos[j] = radius * Math.cos(angle) * across + (Math.random() - 0.5) * 0.12;
+          pos[j + 1] = (progress - 0.5) * height + (Math.random() - 0.5) * 0.18;
+          pos[j + 2] = radius * Math.sin(angle) * across + (Math.random() - 0.5) * 0.12;
+        }
+      }
+      const features = emptyFeatureVector();
+      features[20] = 1;
+      features[21] = 1 / 48; features[22] = 0.68; features[23] = 0.68; features[24] = 0.5;
+      features[25] = 0.75; features[26] = 0.7; features[27] = 0.08; features[28] = 0.2;
+      features[30] = 0.25; features[32] = 0.25; features[34] = 0.5;
+      return { positions: pos, label: 'Double hélice ADN', desc: 'Double hélice et barreaux transversaux, destinée à se dénaturer au premier morph.', features, componentCount: 1, motifCount: 1 };
+    }
+
+    // Assemblage procédural hybride : chaque cycle tire une nouvelle combinaison de nappes,
+    // courbes, tresses, spirales et ramifications, avec positions et paramètres inédits.
+    function generateProceduralShape() {
+      const pos = new Float32Array(COUNT * 3);
+      const noveltyDrive = recentNoveltyDrive();
+      const componentCount = 8 + Math.floor(Math.random() * (25 + noveltyDrive * 12));
+      const overallScale = 6 + Math.random() * (5.5 + noveltyDrive * 1.5);
+      const label = `Forme synthétique · ${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+      const randomVector = (amount) => [(Math.random() - 0.5) * amount, (Math.random() - 0.5) * amount, (Math.random() - 0.5) * amount];
+      const components = Array.from({ length: componentCount }, () => ({
+        kind: chooseMotifKind(),
+        scale: overallScale * (0.24 + Math.random() * 0.88),
+        center: randomVector(overallScale * 1.12),
+        phase: Math.random() * Math.PI * 2,
+        frequencyA: 0.4 + Math.random() * 12,
+        frequencyB: 0.4 + Math.random() * 16,
+        lobes: 2 + Math.floor(Math.random() * 15),
+        width: 0.05 + Math.random() * 1.25,
+        rotation: randomVector(Math.PI * 2),
+        foldIterations: 2 + Math.floor(Math.random() * 11),
+        warpLayers: Array.from({ length: 1 + Math.floor(Math.random() * (6 + noveltyDrive * 2)) }, () => ({
+          amount: overallScale * (0.004 + Math.random() * 0.06),
+          frequency: [0.15 + Math.random() * 1.7, 0.15 + Math.random() * 1.7, 0.15 + Math.random() * 1.7],
+          phase: Math.random() * Math.PI * 2
+        })),
+        controls: Array.from({ length: 4 }, () => randomVector(overallScale * 0.8)),
+        nodes: Array.from({ length: 2 + Math.floor(Math.random() * 9) }, () => randomVector(overallScale * 0.8))
+      }));
+
+      function transformPoint(x, y, z, c) {
+        const [rx, ry, rz] = c.rotation;
+        let cy = Math.cos(rx), sy = Math.sin(rx);
+        [y, z] = [y * cy - z * sy, y * sy + z * cy];
+        cy = Math.cos(ry); sy = Math.sin(ry);
+        [x, z] = [x * cy + z * sy, -x * sy + z * cy];
+        cy = Math.cos(rz); sy = Math.sin(rz);
+        [x, y] = [x * cy - y * sy, x * sy + y * cy];
+        return [x + c.center[0], y + c.center[1], z + c.center[2]];
+      }
+
+      for (let i = 0; i < COUNT; i++) {
+        const c = components[Math.floor(Math.random() * componentCount)];
+        const t = Math.random() * Math.PI * 2;
+        const v = Math.random() * 2 - 1;
+        const s = c.scale, f = c.frequencyA, g = c.frequencyB, phase = c.phase;
+        let x, y, z;
+
+        if (c.kind === 0) { // Nappe plissée, ouverte et irrégulière
+          const u = v;
+          x = u * s;
+          z = (Math.random() * 2 - 1) * s * 0.72;
+          y = s * (0.18 * Math.sin(u * f + phase) + 0.14 * Math.cos(z / s * g + phase * 1.7) + 0.09 * Math.sin(u * f + z / s * g));
+        } else if (c.kind === 1) { // Tresse non circulaire à fréquences variables
+          const progress = t / (Math.PI * 2) - 0.5;
+          const radius = s * (0.22 + 0.24 * Math.sin(g * t + phase));
+          x = s * progress * 1.25;
+          y = radius * Math.sin(f * t + phase) + v * c.width;
+          z = radius * Math.cos((f + 1) * t + phase * 0.73) + v * c.width;
+        } else if (c.kind === 2) { // Courbe de Bézier épaisse, contrôlée par quatre points aléatoires
+          const q = 1 - t / (Math.PI * 2);
+          const w0 = q * q * q, w1 = 3 * q * q * (1 - q), w2 = 3 * q * (1 - q) * (1 - q), w3 = (1 - q) * (1 - q) * (1 - q);
+          const jitter = randomVector(c.width * 2);
+          x = c.controls[0][0] * w0 + c.controls[1][0] * w1 + c.controls[2][0] * w2 + c.controls[3][0] * w3 + jitter[0];
+          y = c.controls[0][1] * w0 + c.controls[1][1] * w1 + c.controls[2][1] * w2 + c.controls[3][1] * w3 + jitter[1];
+          z = c.controls[0][2] * w0 + c.controls[1][2] * w1 + c.controls[2][2] * w2 + c.controls[3][2] * w3 + jitter[2];
+        } else if (c.kind === 3) { // Tresse torique avec rapports de fréquences variables
+          const major = s * (0.34 + 0.1 * Math.sin(g * t + phase));
+          const minor = s * (0.12 + 0.08 * Math.cos(f * t + phase));
+          x = (major + minor * Math.cos(g * t + phase)) * Math.cos(f * t);
+          y = minor * Math.sin(g * t + phase);
+          z = (major + minor * Math.cos(g * t + phase)) * Math.sin(f * t);
+        } else if (c.kind === 4) { // Spirale étirée avec variation de rayon et de hauteur
+          const progress = t / (Math.PI * 2);
+          const angle = f * t + phase + 0.35 * Math.sin(g * t);
+          const radius = s * (0.08 + 0.78 * progress) * (0.72 + 0.28 * Math.sin(g * t + phase));
+          x = radius * Math.cos(angle);
+          y = (progress - 0.5) * s * 1.5 + Math.sin(g * t + phase) * s * 0.16 + v * c.width;
+          z = radius * Math.sin(angle);
+        } else if (c.kind === 5) { // Ramifications courbes orientées dans des directions aléatoires
+          const branch = Math.floor(Math.random() * c.lobes);
+          const progress = t / (Math.PI * 2);
+          const angle = branch * Math.PI * 2 / c.lobes + 0.48 * Math.sin(f * t + phase);
+          const length = s * progress * (0.72 + 0.28 * Math.cos(g * t + phase));
+          x = Math.cos(angle) * length + v * c.width;
+          y = (progress - 0.5) * s + Math.sin(g * t + phase) * s * 0.18;
+          z = Math.sin(angle) * length + v * c.width;
+        } else if (c.kind === 6) { // Courbe de Lissajous spatiale à rapports incommensurables
+          x = s * (0.62 * Math.sin(f * t + phase) + 0.28 * Math.sin((g + 0.37) * t));
+          y = s * (0.58 * Math.cos((f + 0.61) * t + phase) + 0.25 * Math.sin((g + 1.13) * t));
+          z = s * (0.62 * Math.sin((g + 0.83) * t + phase * 1.4) + 0.22 * Math.cos((f + 1.71) * t)) + v * c.width;
+        } else if (c.kind === 7) { // Ruban torsadé à demi-tour variable
+          const twist = t * (0.5 + Math.sin(phase) * 0.35) + phase;
+          const band = v * c.width * (0.5 + 0.5 * Math.sin(g * t + phase));
+          x = s * (0.55 + band * Math.cos(twist)) * Math.cos(t);
+          y = s * band * Math.sin(twist) + 0.12 * s * Math.sin(f * t + phase);
+          z = s * (0.55 + band * Math.cos(twist)) * Math.sin(t);
+        } else if (c.kind === 8) { // Nuage cellulaire autour de nœuds tirés au hasard
+          const node = c.nodes[Math.floor(Math.random() * c.nodes.length)];
+          const azimuth = t, elevation = Math.asin(v), radius = c.width + Math.random() * s * 0.22;
+          x = node[0] + radius * Math.cos(elevation) * Math.cos(azimuth);
+          y = node[1] + radius * Math.sin(elevation);
+          z = node[2] + radius * Math.cos(elevation) * Math.sin(azimuth);
+        } else if (c.kind === 9) { // Surface pliée avec plis de fréquences croisées
+          const u = v * 2 - 1, w = Math.random() * 2 - 1;
+          x = u * s; z = w * s;
+          y = s * (0.2 * Math.sin(f * u + phase) + 0.2 * Math.sin(g * w - phase) + 0.13 * Math.sin(f * u + g * w));
+        } else if (c.kind === 10) { // Filament multi-spirale à rayon modulé
+          const progress = t / (Math.PI * 2);
+          const radius = s * (0.12 + 0.72 * progress) * (0.55 + 0.45 * Math.sin(g * t + phase));
+          const angle = f * t + 0.3 * Math.sin(g * t + phase);
+          x = radius * Math.cos(angle); y = s * (progress - 0.5) + v * c.width; z = radius * Math.sin(angle);
+        } else if (c.kind === 11) { // Système de boucles imbriquées avec ondulation de phase
+          const u = t + 0.22 * Math.sin(g * t + phase);
+          const radius = s * (0.3 + 0.16 * Math.cos((f + 0.5) * t + phase));
+          x = (radius + v * c.width) * Math.cos(f * u);
+          y = s * 0.28 * Math.sin((g + 0.7) * u + phase) + v * c.width;
+          z = (radius + v * c.width) * Math.sin((f + 0.3) * u);
+        } else if (c.kind === 12) { // Attracteur chaotique borné, recalculé avec ses propres coefficients
+          let ax = v, ay = Math.sin(t), az = Math.cos(t);
+          for (let step = 0; step < 9; step++) {
+            const nx = Math.sin(ay * f + phase) - Math.cos(az * g);
+            const ny = Math.sin(az * (f * 0.73) + phase * 1.3) - Math.cos(ax * (g * 0.81));
+            const nz = Math.sin(ax * (g * 0.91) - phase) - Math.cos(ay * (f * 1.12));
+            ax = nx; ay = ny; az = nz;
+          }
+          x = ax * s * 0.46; y = ay * s * 0.46; z = az * s * 0.46;
+        } else if (c.kind === 13) { // Coquille multi-harmonique asymétrique, non sphérique
+          const polar = Math.acos(v);
+          const radius = s * (0.22 + 0.26 * Math.abs(Math.sin(f * t + phase)) + 0.2 * Math.abs(Math.cos(g * polar - phase)) + 0.16 * Math.sin((f + g) * t + polar));
+          x = radius * Math.sin(polar) * Math.cos(t);
+          y = radius * Math.cos(polar) * (0.55 + 0.45 * Math.sin(g * t + phase));
+          z = radius * Math.sin(polar) * Math.sin(t);
+        } else if (c.kind === 14) { // Surface de selle hyperbolique striée
+          const u = v * 2 - 1, w = Math.random() * 2 - 1;
+          x = s * u; z = s * w;
+          y = s * (0.2 * Math.sin(f * u + phase) * Math.cos(g * w - phase) + 0.24 * u * w + 0.08 * Math.sin((f + g) * u * w));
+        } else if (c.kind === 15) { // Tresse polyfréquence à courbure et rayon variables
+          const radius = s * (0.22 + 0.2 * Math.sin(g * t + phase) + 0.1 * Math.cos((f + g) * t));
+          const angle = f * t + 0.3 * Math.sin(g * t + phase);
+          x = radius * Math.cos(angle);
+          y = s * 0.42 * Math.sin((g + 0.37) * t + phase) + v * c.width;
+          z = radius * Math.sin(angle) + s * 0.18 * Math.sin((f - g) * t);
+        } else if (c.kind === 16) { // Attracteur à plis récursifs
+          x = v * s * 0.45; y = Math.sin(t) * s * 0.45; z = Math.cos(t) * s * 0.45;
+          for (let fold = 0; fold < c.foldIterations; fold++) {
+            const nx = s * (0.72 * Math.sin(y / s * f + phase) + 0.18 * Math.cos(z / s * g));
+            const ny = s * (0.72 * Math.sin(z / s * g - phase) + 0.18 * Math.cos(x / s * (f + 0.7)));
+            const nz = s * (0.72 * Math.sin(x / s * (g + 0.4) + phase) + 0.18 * Math.cos(y / s * (f + 1.1)));
+            x = nx; y = ny; z = nz;
+          }
+        } else if (c.kind === 17) { // Réseau de cordes entre nœuds indépendants
+          const start = c.nodes[Math.floor(Math.random() * c.nodes.length)];
+          const end = c.nodes[Math.floor(Math.random() * c.nodes.length)];
+          const q = t / (Math.PI * 2), bend = Math.sin(q * Math.PI) * v * c.width;
+          x = start[0] * (1 - q) + end[0] * q + bend;
+          y = start[1] * (1 - q) + end[1] * q + Math.sin(q * Math.PI * 2 + phase) * c.width;
+          z = start[2] * (1 - q) + end[2] * q - bend;
+        } else if (c.kind === 18) { // Surface polaire à double torsion
+          const polar = Math.acos(v), twist = t + 0.5 * Math.sin(g * polar + phase);
+          const radius = s * (0.28 + 0.26 * Math.sin(f * polar + phase) * Math.cos(g * t - phase));
+          x = radius * Math.sin(polar) * Math.cos(twist);
+          y = radius * Math.cos(polar) + s * 0.16 * Math.sin((f + g) * t + phase);
+          z = radius * Math.sin(polar) * Math.sin(twist);
+        } else if (c.kind === 19) { // Trajectoire chaotique à itérations aléatoires
+          let ax = v, ay = Math.sin(t), az = Math.cos(t);
+          for (let step = 0; step < c.foldIterations; step++) {
+            const nx = Math.sin(ay * f + phase) + 0.35 * Math.cos(az * g);
+            const ny = Math.sin(az * g - phase) + 0.35 * Math.cos(ax * (f + 0.23));
+            const nz = Math.sin(ax * (f + g) + phase) + 0.35 * Math.cos(ay * (g + 0.61));
+            ax = nx; ay = ny; az = nz;
+          }
+          x = ax * s * 0.5; y = ay * s * 0.5; z = az * s * 0.5;
+        } else { // Motif ADN modulable, avec deux brins et des liaisons
+          const progress = t / (Math.PI * 2);
+          const helixAngle = t * (1.4 + f * 0.16) + phase;
+          const helixRadius = s * (0.2 + 0.08 * Math.sin(g * t + phase));
+          if (Math.random() < 0.18) {
+            const across = v, rungAngle = progress * (2 + Math.floor(f)) * Math.PI * 2;
+            x = helixRadius * Math.cos(rungAngle) * across;
+            z = helixRadius * Math.sin(rungAngle) * across;
+            y = (progress - 0.5) * s * 1.5 + (Math.random() - 0.5) * c.width;
+          } else {
+            const side = Math.random() < 0.5 ? 0 : Math.PI;
+            x = helixRadius * Math.cos(helixAngle + side) + v * c.width * 0.15;
+            z = helixRadius * Math.sin(helixAngle + side) + v * c.width * 0.15;
+            y = (progress - 0.5) * s * 1.5;
+          }
+        }
+
+        // Empile 1 à 6 déformations non linéaires propres à chaque composant.
+        for (const warp of c.warpLayers) {
+          const [wx, wy, wz] = warp.frequency;
+          const px = x, py = y, pz = z;
+          x += warp.amount * Math.sin(py * wy + warp.phase) * Math.cos(pz * wz - warp.phase * 0.7);
+          y += warp.amount * Math.sin(pz * wz + warp.phase * 1.3) * Math.cos(px * wx + warp.phase);
+          z += warp.amount * Math.sin(px * wx - warp.phase) * Math.cos(py * wy + warp.phase * 0.4);
+        }
+        const point = transformPoint(x, y, z, c), j = i * 3;
+        pos[j] = point[0]; pos[j + 1] = point[1]; pos[j + 2] = point[2];
+      }
+      const motifHistogram = new Array(MOTIF_KIND_COUNT).fill(0);
+      const scalars = new Array(13).fill(0);
+      for (const component of components) {
+        motifHistogram[component.kind]++;
+        scalars[0] += component.scale / 13;
+        scalars[1] += component.frequencyA / 14;
+        scalars[2] += component.frequencyB / 18;
+        scalars[3] += component.lobes / 16;
+        scalars[4] += component.width / 1.3;
+        scalars[5] += component.warpLayers.length / 8;
+        scalars[6] += component.foldIterations / 14;
+        scalars[7] += Math.abs(component.center[0]) / 13;
+        scalars[8] += Math.abs(component.center[1]) / 13;
+        scalars[9] += Math.abs(component.center[2]) / 13;
+        scalars[10] += Math.abs(component.rotation[0]) / (Math.PI * 2);
+        scalars[11] += Math.abs(component.rotation[1]) / (Math.PI * 2);
+        scalars[12] += Math.abs(component.rotation[2]) / (Math.PI * 2);
+      }
+      const features = emptyFeatureVector();
+      for (let kind = 0; kind < MOTIF_KIND_COUNT; kind++) features[kind] = motifHistogram[kind] / componentCount;
+      features[21] = componentCount / 48;
+      features[22] = overallScale / 13;
+      for (let i = 0; i < scalars.length; i++) features[23 + i] = scalars[i] / componentCount;
+      return { positions: pos, label, desc: 'Assemblage inédit de structures procédurales en mouvement.', features, componentCount, motifCount: motifHistogram.filter(value => value > 0).length };
+    }
+
+    // List of morph shape definitions
+    // Deux emplacements de morph servent uniquement de source et de cible ; chacun utilise le même générateur.
+    const MORPH_SHAPES = [0, 1].map(() => ({
+      name: "Forme générative",
+      desc: "Forme créée à la volée.",
+      generator: generateObservedShape
+    }));
+
+    const particleGeometry = new THREE.BufferGeometry();
+    
+    // La première forme est une hélice ADN ; l'autre cible est déjà une composition aléatoire.
+    const initialDNA = generateDNAMotif();
+    observeShape(initialDNA);
+    const initialShapeData = [initialDNA, MORPH_SHAPES[1].generator()];
+    const shapeBuffers = initialShapeData.map(value => value.positions || value);
+    const shapeLabels = initialShapeData.map((value, index) => value.label || MORPH_SHAPES[index].name);
+    const shapeDescriptions = initialShapeData.map((value, index) => value.desc || MORPH_SHAPES[index].desc);
+    function regenerateShape(index) { const v = MORPH_SHAPES[index].generator(); shapeBuffers[index] = v.positions || v; shapeLabels[index] = v.label || MORPH_SHAPES[index].name; shapeDescriptions[index] = v.desc || MORPH_SHAPES[index].desc; }
+
+    // Current and Target Position Attributes
+    const posCurrent = new Float32Array(shapeBuffers[0]);
+    const posNext = new Float32Array(shapeBuffers[1]);
+
+    const particlePhases = new Float32Array(COUNT);
+    const particleSizes = new Float32Array(COUNT);
+    const particleRandoms = new Float32Array(COUNT * 3);
+
+    for (let i = 0; i < COUNT; i++) {
+      particlePhases[i] = Math.random();
+      particleSizes[i] = 0.2 + Math.random() * 0.55;
+      particleRandoms[i * 3] = (Math.random() - 0.5) * 2.0;
+      particleRandoms[i * 3 + 1] = (Math.random() - 0.5) * 2.0;
+      particleRandoms[i * 3 + 2] = (Math.random() - 0.5) * 2.0;
+    }
+
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(posCurrent, 3));
+    particleGeometry.setAttribute('aTarget', new THREE.BufferAttribute(posNext, 3));
+    particleGeometry.setAttribute('aPhase', new THREE.BufferAttribute(particlePhases, 1));
+    particleGeometry.setAttribute('aSize', new THREE.BufferAttribute(particleSizes, 1));
+    particleGeometry.setAttribute('aRandom', new THREE.BufferAttribute(particleRandoms, 3));
+
+    // Custom WebGL Shaders for Glowing Particles with Dynamic Turbulence
+    const particleVertexShader = `
+      attribute vec3 aTarget;
+      attribute float aPhase;
+      attribute float aSize;
+      attribute vec3 aRandom;
+
+      uniform float uMorphProgress;
+      uniform float uTime;
+      uniform float uSpinAngle;
+      uniform float uShockwave;
+      uniform vec3 uShockCenter;
+
+      varying float vPhase;
+      varying float vDist;
+
+      // Cubic Ease In Out
+      float cubicInOut(float t) {
+        return t < 0.5 ? 4.0 * t * t * t : 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0;
+      }
+
+      void main() {
+        vPhase = aPhase;
+
+        // Smooth transition progress with individual phase dispersion
+        float easedProgress = cubicInOut(uMorphProgress);
+        
+        // Add subtle staggered delay based on particle height & randomness
+        float delay = (position.y + 10.0) * 0.02 + aRandom.x * 0.15;
+        float p = clamp((uMorphProgress - delay * 0.2) / 0.8, 0.0, 1.0);
+        float localProgress = cubicInOut(p);
+
+        // Interpolate between Current Position and Target Position
+        vec3 morphedPos = mix(position, aTarget, localProgress);
+
+        // Continuous Rotation around Y axis
+        float cosA = cos(uSpinAngle);
+        float sinA = sin(uSpinAngle);
+        vec3 rotatedPos;
+        rotatedPos.x = morphedPos.x * cosA - morphedPos.z * sinA;
+        rotatedPos.y = morphedPos.y;
+        rotatedPos.z = morphedPos.x * sinA + morphedPos.z * cosA;
+
+        // Ondulations spatiales continues : la forme respire et se déforme entre les morphs.
+        float flowTime = uTime * 0.72;
+        vec3 flow = vec3(
+          sin(rotatedPos.y * 0.24 + flowTime + aPhase * 1.3),
+          cos(rotatedPos.z * 0.21 - flowTime * 0.83 + aPhase),
+          sin(rotatedPos.x * 0.19 + flowTime * 0.67 - aPhase * 0.8)
+        );
+        rotatedPos += flow * (0.28 + 0.38 * (0.5 + 0.5 * sin(uTime * 0.9 + aPhase * 6.283)));
+
+        // Dispersion burst mid-morph
+        float dispersion = sin(localProgress * 3.14159) * 2.2;
+        rotatedPos += aRandom * dispersion;
+
+        // Dynamic Shockwave interaction
+        if (uShockwave > 0.01) {
+          float d = distance(rotatedPos, uShockCenter);
+          if (d < 25.0) {
+            float force = (1.0 - d / 25.0) * uShockwave * 8.0;
+            rotatedPos += normalize(rotatedPos - uShockCenter) * force;
+          }
+        }
+
+        vec4 mvPosition = modelViewMatrix * vec4(rotatedPos, 1.0);
+        vDist = -mvPosition.z;
+
+        // Twinkle particle size
+        float twinkle = 0.75 + 0.35 * sin(uTime * 6.0 + aPhase * 12.5);
+        gl_PointSize = clamp(aSize * twinkle * (150.0 / max(-mvPosition.z, 1.0)), 1.0, 2.2);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    const particleFragmentShader = `
+      uniform vec3 uColorPrimary;
+      uniform vec3 uColorSecondary;
+      uniform vec3 uColorAccent;
+      uniform float uTime;
+      uniform float uBrightness;
+
+      varying float vPhase;
+      varying float vDist;
+
+      void main() {
+        // Smooth soft radial sprite particle
+        vec2 coord = gl_PointCoord - vec2(0.5);
+        float r = length(coord);
+        if (r > 0.5) discard;
+
+        float glow = 1.0 - smoothstep(0.44, 0.5, r);
+
+        // Dynamic color mix based on particle phase and depth
+        vec3 col = mix(uColorPrimary, uColorSecondary, sin(vPhase * 6.28 + uTime) * 0.5 + 0.5);
+        col = mix(col, uColorAccent, pow(glow, 3.0) * 0.6);
+
+        // Depth fog fading
+        float depthAlpha = 1.0 - smoothstep(10.0, 100.0, vDist);
+
+        // La luminosité ne baisse pas quand la caméra s’approche ; seule la profondeur lointaine est atténuée.
+        gl_FragColor = vec4(col, glow * depthAlpha * 0.8 * uBrightness);
+      }
+    `;
+
+    // Initialize Shader Uniforms
+    const palette = PALETTES[currentPaletteIndex];
+    const particleUniforms = {
+      uMorphProgress: { value: 0.0 },
+      uTime: { value: 0.0 },
+      uBrightness: { value: 0.35 },
+      uSpinAngle: { value: 0.0 },
+      uShockwave: { value: 0.0 },
+      uShockCenter: { value: new THREE.Vector3(0, 0, 0) },
+      uColorPrimary: { value: new THREE.Color(palette.primary) },
+      uColorSecondary: { value: new THREE.Color(palette.secondary) },
+      uColorAccent: { value: new THREE.Color(palette.accent) }
+    };
+
+    const particleMaterial = new THREE.ShaderMaterial({
+      vertexShader: particleVertexShader,
+      fragmentShader: particleFragmentShader,
+      uniforms: particleUniforms,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
     });
-    particles = new THREE.Points(geom, mat);
-    scene.add(particles);
-    currentGeometry = geom;
-}
 
-// ===== SHAPE GENERATION =====
-function generateShapeGeometry(shapeType, count) {
-    const geom = new THREE.BufferGeometry();
-    const positions = new Float32Array(count * 3);
-    const colors = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
-    
-    const palette = PALETTES[paletteIdx];
-    const seed = Date.now() + shapeCounter;
-    const r = () => Math.random();
-    
-    for(let i = 0; i < count; i++) {
-        const p = getPoint(shapeType, r(), seed + i);
-        positions[i*3] = p.x; positions[i*3+1] = p.y; positions[i*3+2] = p.z;
+    const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(particleSystem);
+
+    // Secondary Ambient Particles
+    const ambientCount = 8000;
+    const ambientGeo = new THREE.BufferGeometry();
+    const ambientPos = new Float32Array(ambientCount * 3);
+    for (let i = 0; i < ambientCount * 3; i += 3) {
+      ambientPos[i] = (Math.random() - 0.5) * 90;
+      ambientPos[i + 1] = (Math.random() - 0.5) * 70;
+      ambientPos[i + 2] = (Math.random() - 0.5) * 90;
+    }
+    ambientGeo.setAttribute('position', new THREE.BufferAttribute(ambientPos, 3));
+    const ambientSpriteCanvas = document.createElement('canvas');
+    ambientSpriteCanvas.width = ambientSpriteCanvas.height = 32;
+    const ambientSpriteContext = ambientSpriteCanvas.getContext('2d');
+    const ambientGradient = ambientSpriteContext.createRadialGradient(16, 16, 0, 16, 16, 16);
+    ambientGradient.addColorStop(0, 'rgba(130, 170, 220, 0.55)');
+    ambientGradient.addColorStop(0.35, 'rgba(90, 125, 175, 0.22)');
+    ambientGradient.addColorStop(1, 'rgba(50, 75, 115, 0)');
+    ambientSpriteContext.fillStyle = ambientGradient;
+    ambientSpriteContext.fillRect(0, 0, 32, 32);
+    const ambientSprite = new THREE.CanvasTexture(ambientSpriteCanvas);
+    const ambientMat = new THREE.PointsMaterial({
+      size: 1.1,
+      map: ambientSprite,
+      color: 0x7893b8,
+      transparent: true,
+      opacity: 0.2,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending
+    });
+    const ambientParticles = new THREE.Points(ambientGeo, ambientMat);
+    scene.add(ambientParticles);
+
+    let currentShapeIndex = 0;
+    let nextShapeIndex = 1;
+    let cycleTime = 0;
+    let simulationTime = 0;
+    let isPaused = false;
+    let spinAngleTotal = 0;
+
+    function updateMorphTargets() {
+      // Set current position attribute to target array
+      const posAttr = particleGeometry.attributes.position;
+      const targetAttr = particleGeometry.attributes.aTarget;
+
+      posAttr.copyArray(shapeBuffers[currentShapeIndex]);
+      targetAttr.copyArray(shapeBuffers[nextShapeIndex]);
+
+      posAttr.needsUpdate = true;
+      targetAttr.needsUpdate = true;
+
+      // Update HUD UI
+      const currentShape = MORPH_SHAPES[currentShapeIndex];
+      document.getElementById('shape-title').innerText = shapeLabels[currentShapeIndex];
+      document.getElementById('shape-desc').innerText = shapeDescriptions[currentShapeIndex] || currentShape.desc;
+      document.getElementById('cycle-badge').innerText = `Phase ${currentShapeIndex + 1}/${MORPH_SHAPES.length}`;
+    }
+
+    function triggerNextMorph(direction = 1) {
+      currentShapeIndex = nextShapeIndex;
+      // Les deux buffers alternent : on conserve l'ancienne forme et on génère une nouvelle cible.
+      nextShapeIndex = 1 - currentShapeIndex;
+      regenerateShape(nextShapeIndex);
+      cycleTime = 0;
+      updateMorphTargets();
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Contrôles disponibles au clavier ; l'interface reste masquée au repos.
+    function togglePause() {
+      isPaused = !isPaused;
+      document.getElementById('pause-icon').className = isPaused ? "fa-solid fa-play" : "fa-solid fa-pause";
+      const mobilePause = document.getElementById('mobile-pause');
+      mobilePause.textContent = isPaused ? '▶' : 'Ⅱ';
+      mobilePause.setAttribute('aria-label', isPaused ? 'Reprendre l’animation' : 'Mettre en pause');
+      mobilePause.setAttribute('aria-pressed', String(isPaused));
+    }
+    function cyclePalette() {
+      currentPaletteIndex = (currentPaletteIndex + 1) % PALETTES.length;
+      const pal = PALETTES[currentPaletteIndex];
+      particleUniforms.uColorPrimary.value.set(pal.primary);
+      particleUniforms.uColorSecondary.value.set(pal.secondary);
+      particleUniforms.uColorAccent.value.set(pal.accent);
+    }
+
+    // Button Listeners
+    document.getElementById('btn-pause').addEventListener('click', togglePause);
+
+    document.getElementById('btn-next').addEventListener('click', () => {
+      triggerNextMorph(1);
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      triggerNextMorph(-1);
+    });
+
+    document.getElementById('btn-burst').addEventListener('click', () => {
+      particleUniforms.uShockCenter.value.set(0, 0, 0);
+      particleUniforms.uShockwave.value = 1.5;
+    });
+
+    document.getElementById('btn-palette').addEventListener('click', cyclePalette);
+    document.getElementById('mobile-pause').addEventListener('click', togglePause);
+    document.getElementById('mobile-palette').addEventListener('click', cyclePalette);
+
+    const selfModelPanel = document.getElementById('self-model-panel');
+    function toggleSelfModel() {
+      const visible = selfModelPanel.classList.toggle('visible');
+      selfModelPanel.setAttribute('aria-hidden', String(!visible));
+      const modelButton = document.getElementById('mobile-model');
+      modelButton.setAttribute('aria-pressed', String(visible));
+    }
+    document.getElementById('mobile-model').addEventListener('click', toggleSelfModel);
+
+    const brightnessPanel = document.getElementById('brightness-panel');
+    const brightnessSlider = document.getElementById('brightness-slider');
+    document.getElementById('mobile-brightness').addEventListener('click', () => brightnessPanel.classList.toggle('visible'));
+    brightnessSlider.addEventListener('input', () => {
+      particleUniforms.uBrightness.value = Number(brightnessSlider.value);
+      document.getElementById('brightness-value').textContent = `${Math.round(Number(brightnessSlider.value) * 100)} %`;
+    });
+    window.addEventListener('keydown', (event) => {
+      const isEditing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+      if (isEditing || event.repeat) return;
+      if (event.key.toLowerCase() === 'b') brightnessPanel.classList.toggle('visible');
+      if (event.key.toLowerCase() === 'm') toggleSelfModel();
+      if (event.code === 'Space') { event.preventDefault(); togglePause(); }
+      if (event.key.toLowerCase() === 'c') cyclePalette();
+    });
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.1);
+      if (!isPaused) simulationTime += delta;
+      const time = simulationTime;
+
+      particleUniforms.uTime.value = time;
+
+      if (!isPaused) {
+        cycleTime += delta;
+        spinAngleTotal += delta * CONFIG.spinSpeed;
+
+        // Calculate progress (0.0 to 1.0) for morph cycle
+        let progress = cycleTime / CONFIG.morphDuration;
         
-        const c = new THREE.Color(palette[i % palette.length]);
-        colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
-        sizes[i] = 0.02 + r() * 0.06;
+        if (progress >= 1.0) {
+          triggerNextMorph(1);
+          progress = 0.0;
+        }
+
+        particleUniforms.uMorphProgress.value = progress;
+        particleUniforms.uSpinAngle.value = spinAngleTotal;
+
+        // UI Updates
+        document.getElementById('morph-progress').style.width = `${(progress * 100).toFixed(1)}%`;
+        const currentDegrees = Math.floor((spinAngleTotal * (180 / Math.PI)) % 360);
+        document.getElementById('angle-text').innerText = `${currentDegrees}°`;
+      }
+
+      // Shockwave Decay
+      if (!isPaused && particleUniforms.uShockwave.value > 0.001) {
+        particleUniforms.uShockwave.value *= 0.94;
+      }
+
+      // Rotate ambient particles gently
+      ambientParticles.rotation.y = time * 0.03;
+
+      // Update Orbit controls & Render
+      controls.update();
+      renderer.render(scene, camera);
     }
-    
-    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geom.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-    return geom;
-}
 
-function getPoint(type, rand, seed) {
-    const r = () => rand;
-    const s = 1.0;
-    
-    switch(type) {
-        case 'box': return {x:(r()-0.5)*2*s, y:(r()-0.5)*2*s, z:(r()-0.5)*2*s};
-        case 'sphere': 
-            const t = r()*Math.PI*2, p = Math.acos(2*r()-1), d = Math.pow(r(),1/3);
-            return {x:d*Math.sin(p)*Math.cos(t)*s, y:d*Math.sin(p)*Math.sin(t)*s, z:d*Math.cos(p)*s};
-        case 'torus':
-            const u=r()*Math.PI*2, v=r()*Math.PI*2;
-            return {x:(1+0.3*Math.cos(v))*Math.cos(u)*s, y:(1+0.3*Math.cos(v))*Math.sin(u)*s, z:0.3*Math.sin(v)*s};
-        case 'cone':
-            const t2=r(), a=r()*Math.PI*2;
-            return {x:Math.sqrt(t2)*Math.cos(a)*s, y:(1-t2)*2*s-1, z:Math.sqrt(t2)*Math.sin(a)*s};
-        case 'cylinder':
-            const t3=r(), a2=r()*Math.PI*2;
-            return {x:Math.cos(a2)*s, y:(t3-0.5)*2*s, z:Math.sin(a2)*s};
-        case 'tetrahedron':
-            const vx=[[1,1,1],[-1,-1,1],[-1,1,-1],[1,-1,-1]];
-            const vi=Math.floor(r()*4);
-            return {x:vx[vi][0]*(0.7+r()*0.3)*s, y:vx[vi][1]*(0.7+r()*0.3)*s, z:vx[vi][2]*(0.7+r()*0.3)*s};
-        case 'octahedron':
-            const vo=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
-            const vi2=Math.floor(r()*6);
-            return {x:vo[vi2][0]*(0.8+r()*0.2)*s, y:vo[vi2][1]*(0.8+r()*0.2)*s, z:vo[vi2][2]*(0.8+r()*0.2)*s};
-        case 'icosahedron':
-            const gr=(1+Math.sqrt(5))/2;
-            const vi3=[[0,1,gr],[0,1,-gr],[0,-1,gr],[0,-1,-gr],[1,gr,0],[1,-gr,0],[-1,gr,0],[-1,-gr,0],[gr,0,1],[gr,0,-1],[-gr,0,1],[-gr,0,-1]];
-            const vii=Math.floor(r()*12);
-            const v=vi3[vii];
-            const n=Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);
-            return {x:(v[0]/n)*(0.9+r()*0.1)*s, y:(v[1]/n)*(0.9+r()*0.1)*s, z:(v[2]/n)*(0.9+r()*0.1)*s};
-        case 'star':
-            const a3=r()*Math.PI*2, pt=Math.floor(r()*10);
-            const rad=(pt%2===0)?1:0.4;
-            return {x:rad*Math.cos(a3)*s, y:rad*Math.sin(a3)*s, z:(r()-0.5)*0.2*s};
-        case 'heart':
-            const t4=r()*Math.PI*2;
-            return {x:16*Math.pow(Math.sin(t4),3)*0.08*s, y:(13*Math.cos(t4)-5*Math.cos(2*t4)-2*Math.cos(3*t4)-Math.cos(4*t4))*0.08*s, z:(r()-0.5)*0.3*s};
-        case 'spiral':
-            const st=r()*Math.PI*10, sr=st*0.1;
-            return {x:sr*Math.cos(st)*s, y:sr*Math.sin(st)*s, z:st*0.05*s};
-        case 'helix':
-            const ht=r()*Math.PI*10;
-            return {x:Math.cos(ht)*s, y:ht*0.1*s, z:Math.sin(ht)*s};
-        default: return {x:(r()-0.5)*2*s, y:(r()-0.5)*2*s, z:(r()-0.5)*2*s};
-    }
-}
+    // Window Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.fov = camera.aspect < 1 ? Math.min(75, 45 / Math.max(camera.aspect, 0.6)) : 45;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioCap));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
 
-// ===== MORPHING =====
-function lerpGeometries(g1, g2, progress, count) {
-    const p1 = g1.attributes.position.array;
-    const p2 = g2.attributes.position.array;
-    const c1 = g1.attributes.color.array;
-    const c2 = g2.attributes.color.array;
-    const s1 = g1.attributes.size.array;
-    const s2 = g2.attributes.size.array;
-    const n = Math.min(p1.length/3, p2.length/3, count);
-    const np = new Float32Array(n*3);
-    const nc = new Float32Array(n*3);
-    const ns = new Float32Array(n);
-    
-    for(let i=0; i<n; i++) {
-        const idx = i*3;
-        np[idx] = p1[idx] + (p2[idx%p2.length] - p1[idx]) * progress;
-        np[idx+1] = p1[idx+1] + (p2[(idx+1)%p2.length] - p1[idx+1]) * progress;
-        np[idx+2] = p1[idx+2] + (p2[(idx+2)%p2.length] - p1[idx+2]) * progress;
-        nc[idx] = c1[idx] + (c2[idx%c2.length] - c1[idx]) * progress;
-        nc[idx+1] = c1[idx+1] + (c2[(idx+1)%c2.length] - c1[idx+1]) * progress;
-        nc[idx+2] = c1[idx+2] + (c2[(idx+2)%c2.length] - c1[idx+2]) * progress;
-        ns[i] = s1[i%s1.length] + (s2[i%s2.length] - s1[i%s1.length]) * progress;
-    }
-    
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(np, 3));
-    g.setAttribute('color', new THREE.BufferAttribute(nc, 3));
-    g.setAttribute('size', new THREE.BufferAttribute(ns, 1));
-    return g;
-}
-
-function startMorph() {
-    isMorphing = true;
-    morphStart = Date.now();
-    targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
-}
-
-function setNextShape(dir) {
-    if(dir === 'random') {
-        do { nextShape = SHAPES[Math.floor(Math.random()*SHAPES.length)]; }
-        while(nextShape === currentShape && SHAPES.length > 1);
-    } else {
-        const idx = SHAPES.indexOf(currentShape);
-        nextShape = SHAPES[(idx + dir + SHAPES.length) % SHAPES.length];
-    }
-    startMorph();
-}
-
-// ===== CONTROLS =====
-function setupControls() {
-    document.getElementById('btn-prev').onclick = () => setNextShape(-1);
-    document.getElementById('btn-next').onclick = () => setNextShape(1);
-    document.getElementById('btn-random').onclick = () => setNextShape('random');
-    document.getElementById('btn-pause').onclick = () => {
-        isPaused = !isPaused;
-        document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
+    // Start on window load
+    window.onload = () => {
+      updateMorphTargets();
+      animate();
     };
-    document.getElementById('btn-palette').onclick = () => {
-        paletteIdx = (paletteIdx + 1) % PALETTES.length;
-        particles.geometry.dispose();
-        particles.geometry = generateShapeGeometry(currentShape, CFG.particles);
-        currentGeometry = particles.geometry;
-        if(isMorphing) targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
-    };
-    
-    renderer.domElement.onclick = () => setNextShape('random');
-    
-    document.onkeydown = (e) => {
-        if(e.key===' ') setNextShape('random');
-        else if(e.key==='ArrowLeft') setNextShape(-1);
-        else if(e.key==='ArrowRight') setNextShape(1);
-        else if(e.key==='p'||e.key==='P') {
-            isPaused = !isPaused;
-            document.getElementById('btn-pause').textContent = isPaused ? '▶' : '⏸';
-        }
-        else if(e.key==='c'||e.key==='C') {
-            paletteIdx = (paletteIdx + 1) % PALETTES.length;
-            particles.geometry.dispose();
-            particles.geometry = generateShapeGeometry(currentShape, CFG.particles);
-            currentGeometry = particles.geometry;
-            if(isMorphing) targetGeometry = generateShapeGeometry(nextShape, CFG.particles);
-        }
-    };
-}
-
-// ===== ANIMATION =====
-let lastTime = Date.now();
-let frameCount = 0;
-let fpsTime = lastTime;
-
-function animate() {
-    requestAnimationFrame(animate);
-    const now = Date.now();
-    const delta = (now - lastTime) / 1000;
-    lastTime = now;
-    
-    if(!isPaused) {
-        particles.rotation.y += CFG.rotationSpeed * delta;
-        
-        if(!isMorphing && (now - morphStart) > CFG.morphDuration) {
-            setNextShape('random');
-        }
-        
-        if(isMorphing) {
-            const elapsed = now - morphStart;
-            const progress = Math.min(1, elapsed / CFG.transitionDuration);
-            const g = lerpGeometries(currentGeometry, targetGeometry, progress, CFG.particles);
-            particles.geometry.dispose();
-            particles.geometry = g;
-            
-            if(progress >= 1) {
-                isMorphing = false;
-                currentShape = nextShape;
-                currentGeometry = targetGeometry;
-                shapeCounter++;
-                document.getElementById('shape-name').textContent = currentShape;
-                document.getElementById('shape-index').textContent = shapeCounter;
-                morphStart = now;
-            }
-        }
-        controls.update();
-    }
-    
-    frameCount++;
-    if(now - fpsTime >= 1000) {
-        document.getElementById('fps').textContent = frameCount + ' FPS';
-        frameCount = 0;
-        fpsTime = now;
-    }
-    
-    renderer.render(scene, camera);
-}
-
-// ===== START =====
-// Vérifier une dernière fois que tout est prêt
-if (typeof THREE !== 'undefined' && typeof THREE.OrbitControls !== 'undefined') {
-    document.getElementById('debug-step').textContent = 'Étape 4: Démarrage...';
-    init();
-} else {
-    document.getElementById('debug-step').textContent = 'ERREUR CRITIQUE: Three.js ou OrbitControls non disponibles';
-    document.getElementById('debug-error').textContent = 'Le code ne peut pas s\'exécuter.';
-}
-    </script>
-</body>
-</html>
+  </script>
+    </body>
+  </html>
