@@ -13,12 +13,27 @@
             touch-action: none; font-family: system-ui, sans-serif;
         }
         #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        #loading {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #fff; font-size: 18px; z-index: 1000;
+            background: rgba(0,0,0,0.95); padding: 30px; border-radius: 15px;
+            text-align: center; max-width: 85%;
+        }
+        #loading .step { color: #a0a0ff; font-size: 14px; margin-top: 10px; }
+        #error-panel {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff6666; font-size: 16px; z-index: 1000;
+            background: rgba(0,0,0,0.95); padding: 30px; border-radius: 15px;
+            text-align: center; max-width: 85%;
+            display: none;
+        }
         #info-panel {
             position: fixed; top: 16px; left: 16px; z-index: 100;
             color: #e0e0ff; background: rgba(0,0,10,0.75);
             border-radius: 12px; padding: 12px 16px;
             font: 11px system-ui, sans-serif; backdrop-filter: blur(12px);
             border: 1px solid rgba(100,150,255,0.2);
+            display: none;
         }
         #info-panel h1 {
             font-size: 14px; font-weight: 700;
@@ -36,6 +51,7 @@
             justify-content: center; padding: 10px;
             background: rgba(0,0,10,0.6); border-radius: 15px; backdrop-filter: blur(12px);
             border: 1px solid rgba(100,150,255,0.15);
+            display: none;
         }
         #controls button {
             width: 40px; height: 40px; border: none; border-radius: 10px;
@@ -44,15 +60,16 @@
         }
         #controls button:hover { background: rgba(50,80,150,0.8); transform: scale(1.05); }
         #controls button:active { transform: scale(0.95); }
-        @media (max-width: 600px) {
-            #controls { gap: 6px; }
-            #controls button { width: 36px; height: 36px; font-size: 14px; }
-        }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
+    <div id="loading">
+        <div>Keadex - Chargement...</div>
+        <div class="step" id="step1">Chargement de Three.js...</div>
+        <div class="step" id="step2" style="display:none">Chargement de OrbitControls...</div>
+        <div class="step" id="step3" style="display:none">Initialisation...</div>
+    </div>
+    <div id="error-panel"></div>
     <div id="canvas-container"></div>
     <div id="info-panel">
         <h1>KEADEX</h1>
@@ -66,76 +83,94 @@
     </div>
     <div id="controls">
         <button id="btn-pause" title="Pause/Reprendre">⏸</button>
-        <button id="btn-catharsis" title="Catharsis (Réinitialisation Violente)">💥</button>
+        <button id="btn-catharsis" title="Catharsis">💥</button>
         <button id="btn-evolve" title="Évolution Rapide">⚡</button>
         <button id="btn-palette" title="Changer palette">🎨</button>
         <button id="btn-info" title="Masquer/Afficher infos">ℹ️</button>
     </div>
 
+    <!-- Charger Three.js EN PREMIER - bloquant -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Vérifier Three.js -->
+    <script>
+        if (typeof THREE === 'undefined') {
+            document.getElementById('loading').innerHTML += '<div style="color:#ff4444;margin-top:15px">Erreur: Three.js non chargé. Vérifiez votre connexion ou désactivez les bloquers de scripts.</div>';
+            throw new Error('Three.js failed to load');
+        }
+        document.getElementById('step1').style.display = 'none';
+        document.getElementById('step2').style.display = 'block';
+    </script>
+    
+    <!-- Charger OrbitControls -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- Vérifier OrbitControls -->
+    <script>
+        if (typeof THREE.OrbitControls === 'undefined') {
+            document.getElementById('loading').innerHTML += '<div style="color:#ff4444;margin-top:15px">Erreur: OrbitControls non chargé. Essayez un autre navigateur.</div>';
+            throw new Error('OrbitControls failed to load');
+        }
+        document.getElementById('step2').style.display = 'none';
+        document.getElementById('step3').style.display = 'block';
+    </script>
+
+    <!-- CODE PRINCIPAL - S'exécute UNIQUEMENT si tout est chargé -->
     <script>
 // ============================================================================
-// KEADEX - MOTEUR CATHARTIQUE
-// Génération procédurale infinie de formes novatrices et organiques
+// KEADEX - MOTEUR CATHARTIQUE INFINI
+// Version ultra-robuste avec vérification complète
 // ============================================================================
+
+// Vérification finale
+if (typeof THREE === 'undefined' || typeof THREE.OrbitControls === 'undefined') {
+    const errorPanel = document.getElementById('error-panel');
+    errorPanel.innerHTML = '<h2>Erreur Critique</h2><p>Three.js ou OrbitControls n\'a pas pu être chargé.</p><p style="margin-top:15px;font-size:14px">Essayez de recharger la page (Ctrl+F5) ou utilisez un autre navigateur.</p>';
+    errorPanel.style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
+    throw new Error('Three.js libraries not available');
+}
 
 // ============================================
 // CONFIGURATION
 // ============================================
 const CFG = {
     particles: 60000,
-    maxParticles: 100000,
     rotationSpeed: 0.05,
     fogDensity: 0.002,
-    
-    // Génome
     genomeSize: 512,
     mutationRate: 0.0005,
     evolutionSpeed: 0.0015,
-    
-    // Mémoire
     memorySize: 300,
     similarityThreshold: 0.8,
-    
-    // Champs
-    fieldCount: 12,
-    
-    // Comportements
-    noveltyBias: 0.4,
-    chaosFactor: 0.3,
-    explorationRate: 0.08,
-    
-    // Rendu
-    particleSize: 0.04,
-    particleOpacity: 0.9
+    fieldCount: 12
 };
 
 // ============================================
 // PALETTES
 // ============================================
 const PALETTES = [
-    { name: 'Cosmic Catharsis', colors: [0x22d3ee, 0xa855f7, 0xec4899, 0xf97316, 0x84cc16, 0xef4444], fog: 0x000000, ambient: 0x1e1b4b },
-    { name: 'Quantum Chaos', colors: [0x8b5cf6, 0x06b6d4, 0x22c55e, 0xf59e0b, 0xef4444, 0xeab308], fog: 0x0a041a, ambient: 0x2d1b2d },
-    { name: 'Nebula Purge', colors: [0xec4899, 0x8b5cf6, 0xf97316, 0x10b981, 0x3b82f6, 0xfbbf24], fog: 0x000011, ambient: 0x061e2a },
-    { name: 'Void Rebirth', colors: [0xffffff, 0x6366f1, 0x8b5cf6, 0x000000, 0x374151, 0x6b7280], fog: 0x000000, ambient: 0x000000 },
-    { name: 'Inferno', colors: [0xef4444, 0xf97316, 0xfbbf24, 0x84cc16, 0x22c55e, 0x06b6d4], fog: 0x1a0a00, ambient: 0x331100 }
+    { colors: [0x22d3ee, 0xa855f7, 0xec4899, 0xf97316, 0x84cc16, 0xef4444], fog: 0x000000, ambient: 0x1e1b4b },
+    { colors: [0xef4444, 0xf97316, 0xeab308, 0x84cc16, 0x22c55e, 0x06b6d4], fog: 0x0a041a, ambient: 0x2d1b2d },
+    { colors: [0x06b6d4, 0x22c55e, 0xa855f7, 0xec4899, 0xf97316, 0xfbbf24], fog: 0x000011, ambient: 0x061e2a },
+    { colors: [0x3b82f6, 0x8b5cf6, 0xec4899, 0xf97316, 0xeab308, 0x10b981], fog: 0x000000, ambient: 0x1f2937 },
+    { colors: [0xffffff, 0x6366f1, 0x8b5cf6, 0x000000, 0x374151, 0x6b7280], fog: 0x000000, ambient: 0x000000 }
 ];
 
 // ============================================
-// SYSTÈME DE MÉMOIRE AVEC ANALYSE DE DIVERSITÉ
+// SYSTÈME DE MÉMOIRE
 // ============================================
 class MemorySystem {
     constructor(size = CFG.memorySize) {
         this.size = size;
         this.history = [];
-        this.featureDim = 64;
     }
     
     extractFeatures(geometry) {
         const pos = geometry.attributes.position.array;
         const count = pos.length / 3;
-        const features = new Array(this.featureDim).fill(0);
+        const features = new Array(64).fill(0);
         
-        // Moments statistiques
         let sumX = 0, sumY = 0, sumZ = 0;
         let sumX2 = 0, sumY2 = 0, sumZ2 = 0;
         for (let i = 0; i < count; i++) {
@@ -148,7 +183,6 @@ class MemorySystem {
         features[1] = sumY2/count - (sumY/count)**2;
         features[2] = sumZ2/count - (sumZ/count)**2;
         
-        // Distribution radiale
         const dists = [];
         for (let i = 0; i < count; i++) {
             const idx = i * 3;
@@ -160,7 +194,6 @@ class MemorySystem {
         dists.sort((a,b) => a-b);
         features[3] = dists[0]; features[4] = dists[Math.floor(dists.length/2)]; features[5] = dists[dists.length-1];
         
-        // Histogramme de densité (16 bins)
         const maxD = features[5] || 1;
         for (let i = 0; i < count; i++) {
             const d = dists[i] / maxD;
@@ -168,7 +201,6 @@ class MemorySystem {
             features[6 + bin] += 1/count;
         }
         
-        // Complexité (variation locale)
         let complexity = 0;
         for (let i = 100; i < Math.min(count, 1000); i += 5) {
             const idx = i * 3;
@@ -177,16 +209,6 @@ class MemorySystem {
             complexity += Math.sqrt((x2-x1)**2 + (y2-y1)**2 + (z2-z1)**2);
         }
         features[22] = complexity/180;
-        
-        // Asymétrie
-        let asymX = 0, asymY = 0, asymZ = 0;
-        for (let i = 0; i < count; i++) {
-            const idx = i * 3;
-            asymX += Math.abs(pos[idx]); asymY += Math.abs(pos[idx+1]); asymZ += Math.abs(pos[idx+2]);
-        }
-        features[23] = asymX/(count * features[5]);
-        features[24] = asymY/(count * features[5]);
-        features[25] = asymZ/(count * features[5]);
         
         return features;
     }
@@ -203,11 +225,11 @@ class MemorySystem {
         let maxSim = 0;
         for (const entry of this.history) {
             let sim = 0;
-            for (let i = 0; i < this.featureDim; i++) {
+            for (let i = 0; i < 64; i++) {
                 const diff = (features[i]||0) - (entry.features[i]||0);
                 sim += Math.exp(-Math.abs(diff) * 3);
             }
-            maxSim = Math.max(maxSim, sim/this.featureDim);
+            maxSim = Math.max(maxSim, sim/64);
         }
         return maxSim;
     }
@@ -219,33 +241,27 @@ class MemorySystem {
         for (let i = 0; i < n; i++) {
             for (let j = i+1; j < n; j++) {
                 let sim = 0;
-                for (let k = 0; k < this.featureDim; k++) {
+                for (let k = 0; k < 64; k++) {
                     const diff = (this.history[i].features[k]||0) - (this.history[j].features[k]||0);
                     sim += Math.exp(-Math.abs(diff) * 3);
                 }
-                total += 1 - sim/this.featureDim; count++;
+                total += 1 - sim/64; count++;
             }
         }
         return Math.min(1, total/(count||1));
     }
-    
-    isTooSimilar(features) {
-        return this.calculateSimilarity(features) > CFG.similarityThreshold;
-    }
 }
 
 // ============================================
-// GÉNOME CATHARTIQUE - 512 paramètres
+// GÉNOME
 // ============================================
-class CatharticGenome {
+class Genome {
     constructor(size = CFG.genomeSize) {
         this.size = size;
         this.genes = new Float32Array(size);
         this.velocities = new Float32Array(size);
         this.targets = new Float32Array(size);
         this.age = 0;
-        this.fitness = 1.0;
-        this.lastPerturbation = 0;
         
         for (let i = 0; i < size; i++) {
             this.genes[i] = Math.random();
@@ -257,7 +273,6 @@ class CatharticGenome {
     get(index) { return this.genes[index % this.size]; }
     getRange(index, min, max) { return min + this.get(index) * (max - min); }
     getSigned(index) { return this.get(index) * 2 - 1; }
-    getBool(index) { return this.get(index) > 0.5; }
     
     mutate(rate = CFG.mutationRate) {
         for (let i = 0; i < this.size; i++) {
@@ -281,29 +296,18 @@ class CatharticGenome {
     }
     
     perturb(magnitude = 0.5) {
-        this.lastPerturbation = this.age;
         for (let i = 0; i < this.size; i++) {
             this.genes[i] += (Math.random()-0.5) * magnitude;
             this.genes[i] = Math.max(0, Math.min(1, this.genes[i]));
             this.targets[i] = this.genes[i] + (Math.random()-0.5) * 0.2;
         }
     }
-    
-    clone() {
-        const c = new CatharticGenome(this.size);
-        for (let i = 0; i < this.size; i++) {
-            c.genes[i] = this.genes[i];
-            c.velocities[i] = this.velocities[i];
-            c.targets[i] = this.targets[i];
-        }
-        return c;
-    }
 }
 
 // ============================================
-// CHAMPS DE FORCES CATHARTIQUES
+// CHAMP DE FORCES
 // ============================================
-class CatharticForceField {
+class ForceField {
     constructor(genome, index) {
         this.genome = genome;
         this.index = index;
@@ -313,33 +317,21 @@ class CatharticForceField {
     calculate(x, y, z, time) {
         const g = this.genome;
         const t = time * 0.001;
-        
-        // Type de champ (0-1)
         const fieldType = g.get(this.baseOffset);
-        
-        // Position du centre
         const cx = g.getRange(this.baseOffset+1, -10, 10);
         const cy = g.getRange(this.baseOffset+2, -10, 10);
         const cz = g.getRange(this.baseOffset+3, -10, 10);
-        
-        // Paramètres
         const strength = g.getRange(this.baseOffset+4, -3, 3);
         const radius = g.getRange(this.baseOffset+5, 0.5, 30);
         const frequency = g.getRange(this.baseOffset+6, 0.01, 10);
         const phase = g.getRange(this.baseOffset+7, 0, Math.PI*2);
-        
-        // Paramètres supplémentaires
         const chaos = g.get(this.baseOffset+8);
         const turbulence = g.get(this.baseOffset+9);
-        const symmetry = g.get(this.baseOffset+10);
         const growth = g.getSigned(this.baseOffset+11);
-        
-        // Direction
         const dirX = g.getSigned(this.baseOffset+12);
         const dirY = g.getSigned(this.baseOffset+13);
         const dirZ = g.getSigned(this.baseOffset+14);
         
-        // Calcul
         const dx = x - cx;
         const dy = y - cy;
         const dz = z - cz;
@@ -354,41 +346,26 @@ class CatharticForceField {
             const chaosMod = 1 + chaos * Math.sin(t * 17 + phase * 3) * 0.5;
             
             if (fieldType < 0.25) {
-                // ATTRACTION / RÉPULSION
                 const direction = strength > 0 ? 1 : -1;
                 const force = direction * strength * falloff * timeMod * chaosMod;
-                fx = dx * force;
-                fy = dy * force;
-                fz = dz * force;
+                fx = dx * force; fy = dy * force; fz = dz * force;
             } else if (fieldType < 0.5) {
-                // VORTEX
                 const vortex = strength * 3 * falloff * timeMod * chaosMod;
-                fx = -dy * vortex;
-                fy = dx * vortex;
-                fz = 0;
+                fx = -dy * vortex; fy = dx * vortex; fz = 0;
             } else if (fieldType < 0.75) {
-                // TORSION 3D
                 const torsion = strength * 2 * falloff * timeMod * chaosMod;
-                fx = (-dy + dz) * torsion;
-                fy = (dx - dz) * torsion;
-                fz = (-dx + dy) * torsion;
+                fx = (-dy + dz) * torsion; fy = (dx - dz) * torsion; fz = (-dx + dy) * torsion;
             } else {
-                // CHAMP DIRECTIONNEL + TURBULENCE
                 const magnitude = falloff * Math.abs(strength) * (0.7 + 0.3 * timeMod) * chaosMod;
                 const turbX = Math.sin(x * turbulence * 3 + t) * 0.3;
                 const turbY = Math.sin(y * turbulence * 3 + t * 1.3) * 0.3;
                 const turbZ = Math.sin(z * turbulence * 3 + t * 1.7) * 0.3;
-                fx = (dirX + turbX) * magnitude;
-                fy = (dirY + turbY) * magnitude;
-                fz = (dirZ + turbZ) * magnitude;
+                fx = (dirX + turbX) * magnitude; fy = (dirY + turbY) * magnitude; fz = (dirZ + turbZ) * magnitude;
             }
             
-            // Ajouter croissance/rétrécissement
             if (growth !== 0) {
                 const growForce = growth * 0.1 * falloff * timeMod;
-                fx += dx * growForce;
-                fy += dy * growForce;
-                fz += dz * growForce;
+                fx += dx * growForce; fy += dy * growForce; fz += dz * growForce;
             }
         }
         
@@ -397,9 +374,9 @@ class CatharticForceField {
 }
 
 // ============================================
-// SYSTÈME DE PARTICULES CATHARTIQUES
+// SYSTÈME DE PARTICULES
 // ============================================
-class CatharticParticleSystem {
+class ParticleSystem {
     constructor(genome, count) {
         this.genome = genome;
         this.count = count;
@@ -408,13 +385,11 @@ class CatharticParticleSystem {
         this.material = null;
         this.mesh = null;
         
-        // Champs de forces
         this.forceFields = [];
         for (let i = 0; i < CFG.fieldCount; i++) {
-            this.forceFields.push(new CatharticForceField(genome, i));
+            this.forceFields.push(new ForceField(genome, i));
         }
         
-        // Initialisation
         this.initParticles();
     }
     
@@ -426,13 +401,11 @@ class CatharticParticleSystem {
         const palette = PALETTES[0].colors;
         
         for (let i = 0; i < this.count; i++) {
-            // INITIALISATION NON-SYMÉTRIQUE
-            // Pas de sphère, mais des distributions variées
             const initType = Math.floor(this.genome.get(i % 100) * 6);
             let x, y, z;
             
             switch(initType) {
-                case 0: // Sphère
+                case 0:
                     const theta = Math.random() * Math.PI * 2;
                     const phi = Math.acos(2 * Math.random() - 1);
                     const r = Math.pow(Math.random(), 1/3) * 5;
@@ -440,53 +413,38 @@ class CatharticParticleSystem {
                     y = r * Math.sin(phi) * Math.sin(theta);
                     z = r * Math.cos(phi);
                     break;
-                    
-                case 1: // Cube
+                case 1:
                     x = (Math.random() - 0.5) * 6;
                     y = (Math.random() - 0.5) * 6;
                     z = (Math.random() - 0.5) * 6;
                     break;
-                    
-                case 2: // Ligne brisée
+                case 2:
                     x = (Math.random() - 0.5) * 10;
                     y = (Math.random() - 0.5) * 2;
                     z = (Math.random() - 0.5) * 2;
                     break;
-                    
-                case 3: // Spirale
+                case 3:
                     const angle = Math.random() * Math.PI * 20;
                     const radius = Math.random() * 5;
                     x = radius * Math.cos(angle);
                     y = radius * Math.sin(angle);
                     z = angle * 0.1;
                     break;
-                    
-                case 4: // Grille 3D
-                    x = (Math.floor(Math.random() * 5) - 2) * 1.5;
-                    y = (Math.floor(Math.random() * 5) - 2) * 1.5;
-                    z = (Math.floor(Math.random() * 5) - 2) * 1.5;
-                    x += (Math.random() - 0.5) * 0.5;
-                    y += (Math.random() - 0.5) * 0.5;
-                    z += (Math.random() - 0.5) * 0.5;
+                case 4:
+                    x = (Math.floor(Math.random() * 5) - 2) * 1.5 + (Math.random() - 0.5) * 0.5;
+                    y = (Math.floor(Math.random() * 5) - 2) * 1.5 + (Math.random() - 0.5) * 0.5;
+                    z = (Math.floor(Math.random() * 5) - 2) * 1.5 + (Math.random() - 0.5) * 0.5;
                     break;
-                    
-                default: // Aléatoire complet
+                default:
                     x = (Math.random() - 0.5) * 10;
                     y = (Math.random() - 0.5) * 10;
                     z = (Math.random() - 0.5) * 10;
             }
             
-            positions[i*3] = x;
-            positions[i*3+1] = y;
-            positions[i*3+2] = z;
+            positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
             
-            // Couleur
             const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
-            colors[i*3] = color.r;
-            colors[i*3+1] = color.g;
-            colors[i*3+2] = color.b;
-            
-            // Taille
+            colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
             sizes[i] = 0.02 + Math.random() * 0.06;
             
             this.particles.push({
@@ -497,17 +455,16 @@ class CatharticParticleSystem {
                 color: color,
                 size: sizes[i],
                 age: Math.random() * 100,
-                lifetime: Math.random() * 1000,
                 energy: 0.5 + Math.random() * 0.5
             });
         }
         
         this.updateGeometry();
         this.material = new THREE.PointsMaterial({
-            size: CFG.particleSize,
+            size: 0.04,
             vertexColors: true,
             transparent: true,
-            opacity: CFG.particleOpacity,
+            opacity: 0.9,
             sizeAttenuation: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false
@@ -522,12 +479,8 @@ class CatharticParticleSystem {
         
         for (let i = 0; i < this.count; i++) {
             const p = this.particles[i];
-            positions[i*3] = p.x;
-            positions[i*3+1] = p.y;
-            positions[i*3+2] = p.z;
-            colors[i*3] = p.color.r;
-            colors[i*3+1] = p.color.g;
-            colors[i*3+2] = p.color.b;
+            positions[i*3] = p.x; positions[i*3+1] = p.y; positions[i*3+2] = p.z;
+            colors[i*3] = p.color.r; colors[i*3+1] = p.color.g; colors[i*3+2] = p.color.b;
             sizes[i] = p.size;
         }
         
@@ -541,41 +494,29 @@ class CatharticParticleSystem {
     
     update(deltaTime, globalTime) {
         const g = this.genome;
-        
-        // Paramètres globaux
         const globalChaos = g.getRange(0, 0, 1);
         const mergeRate = g.getRange(1, 0, 0.02);
-        const splitRate = g.getRange(2, 0, 0.02);
         const noiseScale = g.getRange(3, 0.01, 2);
         const colorChangeRate = g.getRange(4, 0, 0.01);
         const maxVelocity = g.getRange(5, 0.01, 0.5);
         
-        // Mettre à jour chaque particule
         for (let i = 0; i < this.count; i++) {
             const p = this.particles[i];
             
-            // Calculer la force totale
             let fx = 0, fy = 0, fz = 0;
-            
-            // Appliquer tous les champs de forces
             for (const field of this.forceFields) {
                 const force = field.calculate(p.x, p.y, p.z, globalTime);
-                fx += force.x;
-                fy += force.y;
-                fz += force.z;
+                fx += force.x; fy += force.y; fz += force.z;
             }
             
-            // Ajouter du bruit
             fx += (Math.random() - 0.5) * noiseScale * globalChaos * 2;
             fy += (Math.random() - 0.5) * noiseScale * globalChaos * 2;
             fz += (Math.random() - 0.5) * noiseScale * globalChaos * 2;
             
-            // Mettre à jour la vitesse
             p.vx += fx * deltaTime * 60;
             p.vy += fy * deltaTime * 60;
             p.vz += fz * deltaTime * 60;
             
-            // Limiter la vitesse
             const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy + p.vz*p.vz);
             if (speed > maxVelocity) {
                 p.vx *= maxVelocity / speed;
@@ -583,59 +524,41 @@ class CatharticParticleSystem {
                 p.vz *= maxVelocity / speed;
             }
             
-            // Mettre à jour la position
             p.x += p.vx * deltaTime * 60;
             p.y += p.vy * deltaTime * 60;
             p.z += p.vz * deltaTime * 60;
             
-            // Vieillissement et énergie
             p.age += deltaTime * 10;
-            p.lifetime += deltaTime * 10;
             p.energy = Math.min(1, p.energy + deltaTime * 0.01);
             
-            // Changer la couleur
             if (Math.random() < colorChangeRate * deltaTime * 60) {
                 const palette = PALETTES[0].colors;
                 p.color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
             }
             
-            // Taille variable
             p.size = 0.02 + Math.sin(p.age * 0.01) * 0.02 + p.energy * 0.02;
             
-            // Limiter la position
             const maxDist = 25;
             const dist = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
             if (dist > maxDist) {
-                p.x *= maxDist / dist;
-                p.y *= maxDist / dist;
-                p.z *= maxDist / dist;
-                p.vx *= -0.3;
-                p.vy *= -0.3;
-                p.vz *= -0.3;
+                p.x *= maxDist / dist; p.y *= maxDist / dist; p.z *= maxDist / dist;
+                p.vx *= -0.3; p.vy *= -0.3; p.vz *= -0.3;
             }
             
-            // FUSION avec autres particules
             if (Math.random() < mergeRate * deltaTime * 60) {
                 const otherIdx = Math.floor(Math.random() * this.count);
                 if (otherIdx !== i) {
                     const other = this.particles[otherIdx];
-                    const dx = other.x - p.x;
-                    const dy = other.y - p.y;
-                    const dz = other.z - p.z;
-                    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-                    if (dist < 0.8) {
-                        p.x += dx * 0.2;
-                        p.y += dy * 0.2;
-                        p.z += dz * 0.2;
-                        p.vx += other.vx * 0.1;
-                        p.vy += other.vy * 0.1;
-                        p.vz += other.vz * 0.1;
+                    const dx = other.x - p.x, dy = other.y - p.y, dz = other.z - p.z;
+                    const dist2 = Math.sqrt(dx*dx + dy*dy + dz*dz);
+                    if (dist2 < 0.8) {
+                        p.x += dx * 0.2; p.y += dy * 0.2; p.z += dz * 0.2;
+                        p.vx += other.vx * 0.1; p.vy += other.vy * 0.1; p.vz += other.vz * 0.1;
                         p.energy = Math.min(1, p.energy + other.energy * 0.1);
                     }
                 }
             }
             
-            // EXPLOSION / CATHARSIS
             if (Math.random() < 0.0001 * deltaTime * 60 && p.energy > 0.8) {
                 p.vx += (Math.random() - 0.5) * 2;
                 p.vy += (Math.random() - 0.5) * 2;
@@ -671,9 +594,9 @@ class CatharticParticleSystem {
 }
 
 // ============================================
-// MOTEUR D'ÉVOLUTION CATHARTIQUE
+// MOTEUR D'ÉVOLUTION
 // ============================================
-class CatharticEvolutionEngine {
+class EvolutionEngine {
     constructor(genome, memory) {
         this.genome = genome;
         this.memory = memory;
@@ -686,10 +609,8 @@ class CatharticEvolutionEngine {
         const features = this.memory.record(geometry);
         const similarity = this.memory.calculateSimilarity(features);
         const diversity = this.memory.getDiversity();
-        
         this.lastSimilarity = similarity;
         this.lastDiversity = diversity;
-        
         return diversity * (1 - similarity);
     }
     
@@ -697,28 +618,17 @@ class CatharticEvolutionEngine {
         this.counter++;
         const fitness = this.evaluate(geometry);
         
-        // Si trop similaire, perturbation MAJEURE
         if (this.lastSimilarity > CFG.similarityThreshold) {
             this.genome.perturb(0.8);
             return;
         }
         
-        // Évolution normale
-        const speed = CFG.evolutionSpeed * 
-            (CFG.noveltyBias * (1 - this.lastSimilarity) + 
-             (1 - CFG.noveltyBias) * this.lastDiversity);
-        
+        const speed = CFG.evolutionSpeed * (0.4 * (1 - this.lastSimilarity) + 0.6 * this.lastDiversity);
         this.genome.evolve(speed);
         this.genome.mutate(CFG.mutationRate * (1 + (1 - this.lastDiversity)));
         
-        // Exploration aléatoire
-        if (Math.random() < CFG.explorationRate) {
+        if (Math.random() < CFG.explorationRate || this.counter % 500 === 0) {
             this.genome.perturb(0.4);
-        }
-        
-        // Perturbation périodique
-        if (this.counter % 500 === 0) {
-            this.genome.perturb(0.3);
         }
     }
 }
@@ -726,41 +636,37 @@ class CatharticEvolutionEngine {
 // ============================================
 // SYSTÈME PRINCIPAL
 // ============================================
-class KeadexSystem {
+class Keadex {
     constructor() {
         this.container = document.getElementById('canvas-container');
-        this.scene = null;
-        this.camera = null;
-        this.renderer = null;
-        this.controls = null;
-        this.particleSystem = null;
-        this.genome = null;
-        this.memory = null;
-        this.evolution = null;
-        this.paletteIndex = 0;
-        this.isPaused = false;
-        this.globalTime = 0;
-        this.lastTime = 0;
-        this.frameCount = 0;
-        this.fpsTime = 0;
+        this.scene = null; this.camera = null; this.renderer = null;
+        this.controls = null; this.particleSystem = null; this.genome = null;
+        this.memory = null; this.evolution = null; this.paletteIndex = 0;
+        this.isPaused = false; this.globalTime = 0; this.lastTime = 0;
+        this.frameCount = 0; this.fpsTime = 0;
         
         this.init();
     }
     
     init() {
-        const isMobile = window.matchMedia('(max-width: 800px)').matches || 
-                        (navigator.maxTouchPoints || 0) > 0;
+        const isMobile = window.matchMedia('(max-width: 800px)').matches;
         if (isMobile) CFG.particles = Math.floor(CFG.particles * 0.5);
         
         this.initThreeJS();
-        this.genome = new CatharticGenome();
+        this.genome = new Genome();
         this.memory = new MemorySystem();
-        this.particleSystem = new CatharticParticleSystem(this.genome, CFG.particles);
+        this.particleSystem = new ParticleSystem(this.genome, CFG.particles);
         this.scene.add(this.particleSystem.getMesh());
-        this.evolution = new CatharticEvolutionEngine(this.genome, this.memory);
+        this.evolution = new EvolutionEngine(this.genome, this.memory);
         
         this.initControls();
         this.updateUI();
+        
+        // Masquer le chargement
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('info-panel').style.display = 'block';
+        document.getElementById('controls').style.display = 'flex';
+        
         this.animate();
     }
     
@@ -803,15 +709,8 @@ class KeadexSystem {
             this.isPaused = !this.isPaused;
             document.getElementById('btn-pause').textContent = this.isPaused ? '▶' : '⏸';
         };
-        
-        document.getElementById('btn-catharsis').onclick = () => {
-            this.catharsis();
-        };
-        
-        document.getElementById('btn-evolve').onclick = () => {
-            this.genome.perturb(0.5);
-        };
-        
+        document.getElementById('btn-catharsis').onclick = () => this.catharsis();
+        document.getElementById('btn-evolve').onclick = () => this.genome.perturb(0.5);
         document.getElementById('btn-palette').onclick = () => {
             this.paletteIndex = (this.paletteIndex + 1) % PALETTES.length;
             const p = PALETTES[this.paletteIndex];
@@ -819,7 +718,6 @@ class KeadexSystem {
             this.scene.background.setHex(p.fog);
             this.particleSystem.changePalette(this.paletteIndex);
         };
-        
         document.getElementById('btn-info').onclick = () => {
             const panel = document.getElementById('info-panel');
             panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
@@ -844,36 +742,31 @@ class KeadexSystem {
     }
     
     catharsis() {
-        // Réinitialisation violente avec nouveau génome
         this.scene.remove(this.particleSystem.getMesh());
-        this.genome = new CatharticGenome();
+        this.genome = new Genome();
         this.memory = new MemorySystem();
-        this.particleSystem = new CatharticParticleSystem(this.genome, CFG.particles);
+        this.particleSystem = new ParticleSystem(this.genome, CFG.particles);
         this.scene.add(this.particleSystem.getMesh());
-        this.evolution = new CatharticEvolutionEngine(this.genome, this.memory);
+        this.evolution = new EvolutionEngine(this.genome, this.memory);
     }
     
     reset() {
         this.scene.remove(this.particleSystem.getMesh());
-        this.genome = new CatharticGenome();
+        this.genome = new Genome();
         this.memory = new MemorySystem();
-        this.particleSystem = new CatharticParticleSystem(this.genome, CFG.particles);
+        this.particleSystem = new ParticleSystem(this.genome, CFG.particles);
         this.scene.add(this.particleSystem.getMesh());
-        this.evolution = new CatharticEvolutionEngine(this.genome, this.memory);
+        this.evolution = new EvolutionEngine(this.genome, this.memory);
     }
     
     updateUI() {
-        document.getElementById('diversity-value').textContent = 
-            Math.round(this.evolution.lastDiversity * 100) + '%';
-        document.getElementById('complexity-value').textContent = 
-            Math.round(this.evolution.lastSimilarity * 100) + '%';
-        document.getElementById('energy-value').textContent = 
-            Math.round(this.genome.age / 1000) + '%';
+        document.getElementById('diversity-value').textContent = Math.round(this.evolution.lastDiversity * 100) + '%';
+        document.getElementById('complexity-value').textContent = Math.round(this.evolution.lastSimilarity * 100) + '%';
+        document.getElementById('energy-value').textContent = Math.round(this.genome.age / 10) + '%';
     }
     
     animate() {
         requestAnimationFrame(() => this.animate());
-        
         const now = Date.now();
         const deltaTime = Math.min(0.1, (now - this.lastTime) / 1000);
         this.lastTime = now;
@@ -895,8 +788,7 @@ class KeadexSystem {
         this.frameCount++;
         if (now - this.fpsTime >= 1000) {
             document.getElementById('fps-value').textContent = this.frameCount;
-            this.frameCount = 0;
-            this.fpsTime = now;
+            this.frameCount = 0; this.fpsTime = now;
         }
         
         this.renderer.render(this.scene, this.camera);
@@ -906,13 +798,13 @@ class KeadexSystem {
 // ============================================
 // DÉMARRAGE
 // ============================================
-if (typeof THREE !== 'undefined' && typeof THREE.OrbitControls !== 'undefined') {
-    new KeadexSystem();
-} else {
-    const debug = document.createElement('div');
-    debug.style.cssText = `position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:#ff4444;font-size:18px;z-index:1000;background:rgba(0,0,0,0.95);padding:30px;border-radius:15px;text-align:center`;
-    debug.innerHTML = '<h2>Erreur</h2><p>Three.js non chargé. Vérifiez votre connexion.</p>';
-    document.body.appendChild(debug);
+try {
+    new Keadex();
+} catch (error) {
+    const errorPanel = document.getElementById('error-panel');
+    errorPanel.innerHTML = '<h2>Erreur</h2><p>' + error.message + '</p><p style="margin-top:15px;font-size:14px">Vérifiez votre connexion ou désactivez les bloquers de scripts.</p>';
+    errorPanel.style.display = 'block';
+    document.getElementById('loading').style.display = 'none';
 }
     </script>
 </body>
