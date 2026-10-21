@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Laniakeon - Accelerando Simulation (Grimes)</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            width: 100%; height: 100%; height: 100dvh;
+            overflow: hidden; background: #000000;
+            user-select: none; -webkit-user-select: none;
+            touch-action: none; font-family: 'Courier New', monospace;
+        }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+        
+        /* UI Futuriste inspirée de Grimes */
+        #accelerando-ui {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 15px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #accelerando-title {
+            color: #ff2ced; font-size: 24px; font-weight: bold;
+            text-shadow: 0 0 10px #ff2ced, 0 0 20px #ff2ced, 0 0 40px #ff2ced;
+            letter-spacing: 3px;
+        }
+        
+        #bpm-display {
+            color: #00f7ff; font-size: 32px; font-weight: bold;
+            text-shadow: 0 0 10px #00f7ff;
+            background: rgba(0, 20, 40, 0.7);
+            padding: 15px 25px; border-radius: 10px;
+            border: 2px solid #00f7ff;
+        }
+        
+        #phase-display {
+            color: #ffffff; font-size: 14px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px; border-radius: 8px;
+            border: 1px solid #ff2ced;
+        }
+        
+        #acceleration-meter {
+            width: 200px; height: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #00f7ff;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #acceleration-fill {
+            width: 0%; height: 100%;
+            background: linear-gradient(90deg, #ff2ced, #00f7ff);
+            transition: width 0.1s linear;
+        }
+        
+        #controls {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; display: flex; gap: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px; border-radius: 15px;
+            border: 2px solid #ff2ced;
+            backdrop-filter: blur(10px);
+        }
+        
+        #controls button {
+            width: 50px; height: 50px; border: none; border-radius: 10px;
+            background: rgba(30, 0, 50, 0.8); color: #ffffff;
+            font-size: 20px; cursor: pointer; transition: all 0.2s;
+            text-shadow: 0 0 5px currentColor;
+        }
+        
+        #controls button:hover {
+            background: rgba(80, 0, 120, 0.9);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px currentColor;
+        }
+        
+        #stats {
+            position: absolute; bottom: 20px; right: 20px;
+            color: #00f7ff; font-size: 12px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px; border-radius: 8px;
+            border: 1px solid #00f7ff;
+        }
+        
+        #loading {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ff2ced; font-size: 24px; z-index: 2000;
+            text-align: center;
+        }
+        
+        .loading-dot { display: inline-block; width: 10px; height: 10px; background: #ff2ced; border-radius: 50%; margin: 0 5px; animation: pulse 1s infinite; }
+        .loading-dot:nth-child(2) { animation-delay: 0.2s; }
+        .loading-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>ACCELERANDO SIMULATION</div>
+        <div style="margin-top: 20px;">
+            <span class="loading-dot"></span>
+            <span class="loading-dot"></span>
+            <span class="loading-dot"></span>
+        </div>
+        <div style="margin-top: 10px; font-size: 14px; color: #00f7ff;">Chargement...</div>
+    </div>
+    <div id="canvas-container"></div>
+    
+    <div id="accelerando-ui">
+        <div id="accelerando-title">ACCELERANDO</div>
+        <div id="bpm-display">BPM: 60</div>
+        <div id="phase-display">Phase: CALME</div>
+        <div id="acceleration-meter">
+            <div id="acceleration-fill"></div>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <button id="btn-play-pause" title="Play/Pause">▶</button>
+        <button id="btn-reset" title="Reset">↻</button>
+        <button id="btn-boost" title="Boost">⚡</button>
+        <button id="btn-palette" title="Palette">🎨</button>
+        <button id="btn-info" title="Info">ℹ</button>
+    </div>
+    
+    <div id="stats">
+        <span>Particules: <span id="particle-count">0</span></span> | 
+        <span>FPS: <span id="fps-value">0</span></span> | 
+        <span>Énergie: <span id="energy-value">0%</span></span>
+    </div>
+
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+
+    <script>
+// ============================================================================
+// LANIAKEON - ACCELERANDO SIMULATION (Inspirée de Grimes)
+// Fusion entre le système évolutif de Keadex et les éruptions solaires 3D
+// Avec accélération progressive comme dans le clip Accelerando
+// ============================================================================
+
+// Vérification des dépendances
+if (typeof THREE === 'undefined' || typeof THREE.OrbitControls === 'undefined') {
+    document.getElementById('loading').innerHTML = '<div style="color:#ff4444;">Erreur: Three.js non chargé</div>';
+    throw new Error('Three.js libraries not available');
+}
+
+// ============================================
+// CONFIGURATION - ACCELERANDO
+// ============================================
+const ACCELERANDO_CONFIG = {
+    // Phases du clip (en secondes)
+    phases: [
+        { name: 'CALME', duration: 15000, bpm: 60, acceleration: 0.0, intensity: 0.3 },
+        { name: 'ACCÉLÉRATION', duration: 20000, bpm: 90, acceleration: 0.0005, intensity: 0.6 },
+        { name: 'CLIMAX', duration: 15000, bpm: 180, acceleration: 0.001, intensity: 1.0 },
+        { name: 'DÉCÉLÉRATION', duration: 10000, bpm: 120, acceleration: -0.0008, intensity: 0.7 },
+        { name: 'RETOUR', duration: 10000, bpm: 60, acceleration: 0.0, intensity: 0.4 }
+    ],
+    
+    // Configuration des particules
+    particleCount: 120000,
+    starRadius: 8.0,
+    loopCount: 60,
+    
+    // Palettes inspirées de Grimes (cyberpunk, néon, futuriste)
+    palettes: [
+        {
+            name: 'GRIMES PINK',
+            colors: [0xff2ced, 0x00f7ff, 0x8a2be2, 0xff69b4, 0x00ff88, 0xffffff],
+            fog: 0x0a041a, ambient: 0x2d1b2d, glow: 0xff2ced
+        },
+        {
+            name: 'CYBERPUNK',
+            colors: [0x00f7ff, 0xff2ced, 0x8a2be2, 0xff69b4, 0x00ff88, 0x00ffff],
+            fog: 0x000011, ambient: 0x061e2a, glow: 0x00f7ff
+        },
+        {
+            name: 'NEON DREAM',
+            colors: [0x00f7ff, 0xff2ced, 0xffffff, 0x8a2be2, 0x00ff88, 0xff69b4],
+            fog: 0x000000, ambient: 0x000000, glow: 0xffffff
+        },
+        {
+            name: 'DARK TECHNO',
+            colors: [0xff2ced, 0x8a2be2, 0xff69b4, 0x00ff88, 0x00f7ff, 0xffffff],
+            fog: 0x0a041a, ambient: 0x1a041a, glow: 0xff2ced
+        }
+    ],
+    
+    // Génome
+    genomeSize: 512,
+    mutationRate: 0.0005,
+    evolutionSpeed: 0.002,
+    memorySize: 200,
+    fieldCount: 10
+};
+
+// ============================================
+// Bruit de Simplex 3D (pour les effets organiques)
+// ============================================
+const SimplexNoise = function() {
+    var F3 = 1.0 / 3.0, G3 = 1.0 / 6.0;
+    var p = new Uint8Array(256);
+    for (var i = 0; i < 256; i++) p[i] = Math.floor(Math.random() * 256);
+    var perm = new Uint8Array(512), permMod12 = new Uint8Array(512);
+    for (var i = 0; i < 512; i++) {
+        perm[i] = p[i & 255];
+        permMod12[i] = (perm[i] % 12);
+    }
+    
+    return {
+        noise3D: function(xin, yin, zin) {
+            var n0, n1, n2, n3;
+            var s = (xin + yin + zin) * F3;
+            var i = Math.floor(xin + s), j = Math.floor(yin + s), k = Math.floor(zin + s);
+            var t = (i + j + k) * G3;
+            var X0 = i - t, Y0 = j - t, Z0 = k - t;
+            var x0 = xin - X0, y0 = yin - Y0, z0 = zin - Z0;
+            var i1, j1, k1, i2, j2, k2;
+            
+            if (x0 >= y0) {
+                if (y0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=1; k2=0; }
+                else if (x0 >= z0) { i1=1; j1=0; k1=0; i2=1; j2=0; k2=1; }
+                else { i1=0; j1=0; k1=1; i2=1; j2=0; k2=1; }
+            } else {
+                if (y0 < z0) { i1=0; j1=0; k1=1; i2=0; j2=1; k2=1; }
+                else if (x0 < z0) { i1=0; j1=1; k1=0; i2=0; j2=1; k2=1; }
+                else { i1=0; j1=1; k1=0; i2=1; j2=1; k2=0; }
+            }
+            
+            var x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3;
+            var x2 = x0 - i2 + 2.0*G3, y2 = y0 - j2 + 2.0*G3, z2 = z0 - k2 + 2.0*G3;
+            var x3 = x0 - 1.0 + 3.0*G3, y3 = y0 - 1.0 + 3.0*G3, z3 = z0 - 1.0 + 3.0*G3;
+            var ii = i & 255, jj = j & 255, kk = k & 255;
+            var gi0 = permMod12[ii+perm[jj+perm[kk]]];
+            var gi1 = permMod12[ii+i1+perm[jj+j1+perm[kk+k1]]];
+            var gi2 = permMod12[ii+i2+perm[jj+j2+perm[kk+k2]]];
+            var gi3 = permMod12[ii+1+perm[jj+1+perm[kk+1]]];
+            
+            var t0 = 0.6 - x0*x0 - y0*y0 - z0*z0; if (t0<0) n0 = 0.0; else { t0 *= t0; n0 = t0 * t0 * (gi0%2===0?1:-1)*(x0 + y0); }
+            var t1 = 0.6 - x1*x1 - y1*y1 - z1*z1; if (t1<0) n1 = 0.0; else { t1 *= t1; n1 = t1 * t1 * (gi1%2===0?1:-1)*(x1 + y1); }
+            var t2 = 0.6 - x2*x2 - y2*y2 - z2*z2; if (t2<0) n2 = 0.0; else { t2 *= t2; n2 = t2 * t2 * (gi2%2===0?1:-1)*(x2 + y2); }
+            var t3 = 0.6 - x3*x3 - y3*y3 - z3*z3; if (t3<0) n3 = 0.0; else { t3 *= t3; n3 = t3 * t3 * (gi3%2===0?1:-1)*(x3 + y3); }
+            
+            return 32.0 * (n0 + n1 + n2 + n3);
+        }
+    };
+};
+
+// ============================================
+// GESTIONNAIRE DE PHASES ACCELERANDO
+// ============================================
+class AccelerandoPhaseManager {
+    constructor() {
+        this.phases = ACCELERANDO_CONFIG.phases;
+        this.currentPhaseIndex = 0;
+        this.phaseStartTime = Date.now();
+        this.currentBPM = this.phases[0].bpm;
+        this.currentAcceleration = this.phases[0].acceleration;
+        this.currentIntensity = this.phases[0].intensity;
+        this.isPlaying = true;
+        this.globalTime = 0;
+    }
+    
+    update() {
+        if (!this.isPlaying) return;
+        
+        const elapsed = Date.now() - this.phaseStartTime;
+        const currentPhase = this.phases[this.currentPhaseIndex];
+        
+        // Calcul du BPM actuel avec accélération
+        const phaseElapsed = elapsed / 1000;
+        const bpmChange = currentPhase.acceleration * phaseElapsed * currentPhase.bpm;
+        this.currentBPM = Math.max(10, Math.min(300, currentPhase.bpm + bpmChange));
+        
+        // Calcul de l'intensité
+        const intensityChange = currentPhase.intensity * (1 - Math.exp(-phaseElapsed * 0.001));
+        this.currentIntensity = currentPhase.intensity * intensityChange;
+        
+        // Transition vers la phase suivante
+        if (elapsed >= currentPhase.duration) {
+            this.currentPhaseIndex = (this.currentPhaseIndex + 1) % this.phases.length;
+            this.phaseStartTime = Date.now();
+            this.currentBPM = this.phases[this.currentPhaseIndex].bpm;
+        }
+        
+        this.globalTime += 16.67; // ~60 FPS
+    }
+    
+    getCurrentPhase() {
+        return this.phases[this.currentPhaseIndex];
+    }
+    
+    getBPM() {
+        return Math.round(this.currentBPM);
+    }
+    
+    getAccelerationProgress() {
+        const currentPhase = this.phases[this.currentPhaseIndex];
+        const elapsed = Date.now() - this.phaseStartTime;
+        return Math.min(1, elapsed / currentPhase.duration);
+    }
+    
+    getIntensity() {
+        return this.currentIntensity;
+    }
+    
+    togglePlayPause() {
+        this.isPlaying = !this.isPlaying;
+        if (this.isPlaying) {
+            this.phaseStartTime = Date.now() - (this.phaseStartTime - Date.now());
+        }
+    }
+    
+    reset() {
+        this.currentPhaseIndex = 0;
+        this.phaseStartTime = Date.now();
+        this.currentBPM = this.phases[0].bpm;
+        this.globalTime = 0;
+    }
+    
+    boost() {
+        // Passer à la phase suivante
+        this.currentPhaseIndex = Math.min(this.currentPhaseIndex + 1, this.phases.length - 1);
+        this.phaseStartTime = Date.now();
+        this.currentBPM = this.phases[this.currentPhaseIndex].bpm;
+    }
+}
+
+// ============================================
+// SYSTÈME DE MÉMOIRE (pour l'évolution)
+// ============================================
+class MemorySystem {
+    constructor(size = ACCELERANDO_CONFIG.memorySize) {
+        this.size = size;
+        this.history = [];
+    }
+    
+    extractFeatures(geometry) {
+        const pos = geometry.attributes.position.array;
+        const count = Math.min(pos.length / 3, 1000);
+        const features = new Array(32).fill(0);
+        
+        let sumX = 0, sumY = 0, sumZ = 0;
+        for (let i = 0; i < count; i++) {
+            const idx = i * 3;
+            sumX += pos[idx]; sumY += pos[idx+1]; sumZ += pos[idx+2];
+        }
+        features[0] = sumX / count;
+        features[1] = sumY / count;
+        features[2] = sumZ / count;
+        
+        let varianceX = 0, varianceY = 0, varianceZ = 0;
+        for (let i = 0; i < count; i++) {
+            const idx = i * 3;
+            varianceX += Math.pow(pos[idx] - features[0], 2);
+            varianceY += Math.pow(pos[idx+1] - features[1], 2);
+            varianceZ += Math.pow(pos[idx+2] - features[2], 2);
+        }
+        features[3] = varianceX / count;
+        features[4] = varianceY / count;
+        features[5] = varianceZ / count;
+        
+        return features;
+    }
+    
+    record(geometry) {
+        const features = this.extractFeatures(geometry);
+        this.history.push({ features, time: Date.now() });
+        if (this.history.length > this.size) this.history.shift();
+        return features;
+    }
+    
+    getDiversity() {
+        if (this.history.length < 2) return 1;
+        let total = 0, count = 0;
+        const n = Math.min(this.history.length, 20);
+        for (let i = 0; i < n; i++) {
+            for (let j = i+1; j < n; j++) {
+                let dist = 0;
+                for (let k = 0; k < 32; k++) {
+                    dist += Math.abs((this.history[i].features[k]||0) - (this.history[j].features[k]||0));
+                }
+                total += dist; count++;
+            }
+        }
+        return Math.min(1, total / (count * 32 || 1));
+    }
+}
+
+// ============================================
+// GÉNOME (pour l'évolution)
+// ============================================
+class Genome {
+    constructor(size = ACCELERANDO_CONFIG.genomeSize) {
+        this.size = size;
+        this.genes = new Float32Array(size);
+        this.velocities = new Float32Array(size);
+        this.targets = new Float32Array(size);
+        this.age = 0;
+        
+        for (let i = 0; i < size; i++) {
+            this.genes[i] = Math.random();
+            this.velocities[i] = (Math.random()-0.5) * 0.02;
+            this.targets[i] = Math.random();
+        }
+    }
+    
+    get(index) { 
+        return this.genes[Math.floor(index) % this.size]; 
+    }
+    
+    getRange(index, min, max) { 
+        return min + this.get(index) * (max - min); 
+    }
+    
+    getSigned(index) { 
+        return this.get(index) * 2 - 1; 
+    }
+    
+    mutate(rate = ACCELERANDO_CONFIG.mutationRate) {
+        for (let i = 0; i < this.size; i++) {
+            if (Math.random() < rate) {
+                this.genes[i] += (Math.random()-0.5) * 0.3;
+                this.genes[i] = Math.max(0, Math.min(1, this.genes[i]));
+            }
+        }
+    }
+    
+    evolve(speed = ACCELERANDO_CONFIG.evolutionSpeed) {
+        this.age++;
+        for (let i = 0; i < this.size; i++) {
+            if (Math.random() < 0.005) this.targets[i] = Math.random();
+            const diff = this.targets[i] - this.genes[i];
+            this.velocities[i] += diff * speed * 0.1 + (Math.random()-0.5) * 0.002;
+            this.velocities[i] *= 0.98;
+            this.genes[i] += this.velocities[i];
+            this.genes[i] = Math.max(0, Math.min(1, this.genes[i]));
+        }
+    }
+    
+    perturb(magnitude = 0.5) {
+        for (let i = 0; i < this.size; i++) {
+            this.genes[i] += (Math.random()-0.5) * magnitude;
+            this.genes[i] = Math.max(0, Math.min(1, this.genes[i]));
+        }
+    }
+}
+
+// ============================================
+// CHAMP DE FORCES (pour les particules)
+// ============================================
+class ForceField {
+    constructor(genome, index, phaseManager) {
+        this.genome = genome;
+        this.index = index;
+        this.phaseManager = phaseManager;
+        this.baseOffset = index * 16;
+    }
+    
+    calculate(x, y, z, time) {
+        const g = this.genome;
+        const phaseManager = this.phaseManager;
+        const bpm = phaseManager.getBPM();
+        const intensity = phaseManager.getIntensity();
+        const t = time * 0.001;
+        
+        const fieldType = g.get(this.baseOffset);
+        const cx = g.getRange(this.baseOffset+1, -20, 20);
+        const cy = g.getRange(this.baseOffset+2, -20, 20);
+        const cz = g.getRange(this.baseOffset+3, -20, 20);
+        const strength = g.getRange(this.baseOffset+4, -5, 5) * intensity;
+        const radius = g.getRange(this.baseOffset+5, 1, 50);
+        const frequency = g.getRange(this.baseOffset+6, 0.01, 20) * (bpm / 60);
+        const phase = g.getRange(this.baseOffset+7, 0, Math.PI*2);
+        const chaos = g.get(this.baseOffset+8) * intensity;
+        const turbulence = g.get(this.baseOffset+9) * intensity;
+        
+        const dx = x - cx;
+        const dy = y - cy;
+        const dz = z - cz;
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        
+        let fx = 0, fy = 0, fz = 0;
+        
+        if (dist < radius) {
+            const normDist = dist / radius;
+            const falloff = 1 - normDist * normDist;
+            const timeMod = Math.sin(t * frequency + phase);
+            const chaosMod = 1 + chaos * Math.sin(t * 17 + phase * 3) * 0.5;
+            const bpmMod = 1 + Math.sin(t * bpm * 0.1) * 0.3;
+            
+            if (fieldType < 0.25) {
+                // Attraction/Répulsion
+                const direction = strength > 0 ? 1 : -1;
+                const force = direction * strength * falloff * timeMod * chaosMod * bpmMod;
+                fx = dx * force; fy = dy * force; fz = dz * force;
+            } else if (fieldType < 0.5) {
+                // Vortex
+                const vortex = strength * 5 * falloff * timeMod * chaosMod * bpmMod;
+                fx = -dy * vortex; fy = dx * vortex; fz = 0;
+            } else if (fieldType < 0.75) {
+                // Torsion
+                const torsion = strength * 3 * falloff * timeMod * chaosMod * bpmMod;
+                fx = (-dy + dz) * torsion; 
+                fy = (dx - dz) * torsion; 
+                fz = (-dx + dy) * torsion;
+            } else {
+                // Turbulence
+                const magnitude = falloff * Math.abs(strength) * (0.7 + 0.3 * timeMod) * chaosMod * bpmMod;
+                const turbX = Math.sin(x * turbulence * 3 + t * bpmMod) * 0.5;
+                const turbY = Math.sin(y * turbulence * 3 + t * 1.3 * bpmMod) * 0.5;
+                const turbZ = Math.sin(z * turbulence * 3 + t * 1.7 * bpmMod) * 0.5;
+                fx = turbX * magnitude; 
+                fy = turbY * magnitude; 
+                fz = turbZ * magnitude;
+            }
+        }
+        
+        return { x: fx, y: fy, z: fz };
+    }
+}
+
+// ============================================
+// SYSTÈME DE PARTICULES HYBRIDE
+// (Fusion entre Laniakeon et les éruptions solaires)
+// ============================================
+class HybridParticleSystem {
+    constructor(genome, count, phaseManager) {
+        this.genome = genome;
+        this.count = count;
+        this.phaseManager = phaseManager;
+        this.particles = [];
+        this.geometry = null;
+        this.material = null;
+        this.mesh = null;
+        this.magneticLoops = [];
+        this.simplex = SimplexNoise();
+        
+        this.forceFields = [];
+        for (let i = 0; i < ACCELERANDO_CONFIG.fieldCount; i++) {
+            this.forceFields.push(new ForceField(genome, i, phaseManager));
+        }
+        
+        this.initParticles();
+        this.generateCoronalLoops();
+    }
+    
+    initParticles() {
+        const positions = new Float32Array(this.count * 3);
+        const colors = new Float32Array(this.count * 3);
+        const sizes = new Float32Array(this.count);
+        const phases = new Float32Array(this.count);
+        
+        const palette = ACCELERANDO_CONFIG.palettes[0].colors;
+        
+        for (let i = 0; i < this.count; i++) {
+            const initType = Math.floor(Math.random() * 4);
+            let x, y, z;
+            
+            switch(initType) {
+                case 0: // Sphérique
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const r = Math.pow(Math.random(), 1/3) * ACCELERANDO_CONFIG.starRadius * 1.5;
+                    x = r * Math.sin(phi) * Math.cos(theta);
+                    y = r * Math.sin(phi) * Math.sin(theta);
+                    z = r * Math.cos(phi);
+                    break;
+                case 1: // Cubique
+                    x = (Math.random() - 0.5) * ACCELERANDO_CONFIG.starRadius * 2;
+                    y = (Math.random() - 0.5) * ACCELERANDO_CONFIG.starRadius * 2;
+                    z = (Math.random() - 0.5) * ACCELERANDO_CONFIG.starRadius * 2;
+                    break;
+                case 2: // Sur les boucles coronales
+                    const loopIdx = Math.floor(Math.random() * this.magneticLoops.length);
+                    const progress = Math.random();
+                    const loop = this.magneticLoops[loopIdx];
+                    const point = loop.curve.getPoint(progress);
+                    x = point.x + (Math.random() - 0.5) * 2;
+                    y = point.y + (Math.random() - 0.5) * 2;
+                    z = point.z + (Math.random() - 0.5) * 2;
+                    break;
+                default: // Aléatoire
+                    x = (Math.random() - 0.5) * ACCELERANDO_CONFIG.starRadius * 3;
+                    y = (Math.random() - 0.5) * ACCELERANDO_CONFIG.starRadius * 3;
+                    z = (Math.random() - 0.5) * ACCELERANDO_CONFIG.starRadius * 3;
+            }
+            
+            positions[i*3] = x; positions[i*3+1] = y; positions[i*3+2] = z;
+            
+            const color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+            colors[i*3] = color.r; colors[i*3+1] = color.g; colors[i*3+2] = color.b;
+            sizes[i] = 0.05 + Math.random() * 0.2;
+            phases[i] = Math.random();
+            
+            this.particles.push({
+                x: x, y: y, z: z,
+                vx: (Math.random() - 0.5) * 0.1,
+                vy: (Math.random() - 0.5) * 0.1,
+                vz: (Math.random() - 0.5) * 0.1,
+                color: color,
+                size: sizes[i],
+                phase: phases[i],
+                age: Math.random() * 100,
+                energy: 0.5 + Math.random() * 0.5,
+                type: initType === 2 ? 'loop' : 'free',
+                loopIdx: initType === 2 ? loopIdx : 0,
+                progress: initType === 2 ? progress : 0
+            });
+        }
+        
+        this.updateGeometry();
+        
+        // Matériau avec shaders personnalisés
+        this.material = new THREE.ShaderMaterial({
+            uniforms: {
+                uTime: { value: 0 },
+                uIntensity: { value: 1.0 },
+                uBPM: { value: 60 },
+                uGlowColor: { value: new THREE.Color(0xff2ced) }
+            },
+            vertexShader: `
+                attribute float size;
+                attribute vec3 color;
+                attribute float phase;
+                
+                varying vec3 vColor;
+                varying float vPhase;
+                
+                uniform float uTime;
+                uniform float uIntensity;
+                uniform float uBPM;
+                
+                void main() {
+                    vColor = color;
+                    vPhase = phase;
+                    
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    
+                    // Effet de scintillement synchronisé avec le BPM
+                    float bpmFactor = sin(uTime * uBPM * 0.1 + phase * 10.0) * 0.5 + 0.5;
+                    float twinkle = 0.8 + 0.2 * sin(uTime * 10.0 + phase * 15.0) * bpmFactor;
+                    
+                    // Taille dynamique basée sur l'énergie
+                    gl_PointSize = size * twinkle * uIntensity * (300.0 / -mvPosition.z);
+                    
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                varying float vPhase;
+                
+                uniform float uTime;
+                uniform float uIntensity;
+                uniform vec3 uGlowColor;
+                
+                void main() {
+                    vec2 coord = gl_PointCoord - vec2(0.5);
+                    float dist = length(coord);
+                    
+                    if (dist > 0.5) discard;
+                    
+                    // Effet de glow
+                    float glow = pow(1.0 - (dist * 2.0), 3.0);
+                    
+                    // Couleur finale avec mélange de glow
+                    vec3 finalColor = mix(vColor, uGlowColor, glow * 0.5 * uIntensity);
+                    
+                    // Brillance supplémentaire
+                    float brightness = 0.8 + 0.2 * sin(uTime * 5.0 + vPhase * 10.0);
+                    finalColor *= brightness;
+                    
+                    gl_FragColor = vec4(finalColor, glow * 0.9 * uIntensity);
+                }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+        
+        this.mesh = new THREE.Points(this.geometry, this.material);
+    }
+    
+    generateCoronalLoops() {
+        for (let l = 0; l < ACCELERANDO_CONFIG.loopCount; l++) {
+            const theta1 = Math.random() * Math.PI * 2;
+            const phi1 = (Math.random() - 0.5) * Math.PI * 0.9;
+            
+            const p1 = new THREE.Vector3().setFromSphericalCoords(
+                ACCELERANDO_CONFIG.starRadius * 0.95, 
+                phi1 + Math.PI/2, 
+                theta1
+            );
+            
+            const span = 0.3 + Math.random() * 2.8;
+            const theta2 = theta1 + (Math.random() - 0.5) * span;
+            const phi2 = phi1 + (Math.random() - 0.5) * span;
+            const p2 = new THREE.Vector3().setFromSphericalCoords(
+                ACCELERANDO_CONFIG.starRadius * 0.95, 
+                phi2 + Math.PI/2, 
+                theta2
+            );
+            
+            const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+            const apexDist = ACCELERANDO_CONFIG.starRadius + 8.0 + Math.pow(Math.random(), 1.5) * 55.0;
+            mid.normalize().multiplyScalar(apexDist);
+            
+            const curve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
+            
+            this.magneticLoops.push({
+                curve: curve,
+                speed: 0.25 + Math.random() * 0.85,
+                twist: 3.0 + Math.random() * 10.0,
+                color: new THREE.Color(ACCELERANDO_CONFIG.palettes[0].colors[Math.floor(Math.random() * 6)])
+            });
+        }
+    }
+    
+    updateGeometry() {
+        const positions = new Float32Array(this.count * 3);
+        const colors = new Float32Array(this.count * 3);
+        const sizes = new Float32Array(this.count);
+        const phases = new Float32Array(this.count);
+        
+        for (let i = 0; i < this.count; i++) {
+            const p = this.particles[i];
+            positions[i*3] = p.x; positions[i*3+1] = p.y; positions[i*3+2] = p.z;
+            colors[i*3] = p.color.r; colors[i*3+1] = p.color.g; colors[i*3+2] = p.color.b;
+            sizes[i] = p.size;
+            phases[i] = p.phase;
+        }
+        
+        if (this.geometry) this.geometry.dispose();
+        this.geometry = new THREE.BufferGeometry();
+        this.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        this.geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        this.geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        this.geometry.setAttribute('phase', new THREE.BufferAttribute(phases, 1));
+        this.mesh.geometry = this.geometry;
+    }
+    
+    update(deltaTime, globalTime) {
+        const phaseManager = this.phaseManager;
+        const bpm = phaseManager.getBPM();
+        const intensity = phaseManager.getIntensity();
+        const accelerationProgress = phaseManager.getAccelerationProgress();
+        
+        // Mettre à jour les uniforms du matériau
+        this.material.uniforms.uTime.value = globalTime * 0.001;
+        this.material.uniforms.uIntensity.value = intensity;
+        this.material.uniforms.uBPM.value = bpm;
+        
+        const palette = ACCELERANDO_CONFIG.palettes[0];
+        this.material.uniforms.uGlowColor.value = new THREE.Color(palette.glow);
+        
+        for (let i = 0; i < this.count; i++) {
+            const p = this.particles[i];
+            
+            // Forces de base
+            let fx = 0, fy = 0, fz = 0;
+            
+            // Forces des champs
+            for (const field of this.forceFields) {
+                const force = field.calculate(p.x, p.y, p.z, globalTime);
+                fx += force.x; fy += force.y; fz += force.z;
+            }
+            
+            // Bruit de Simplex pour la turbulence
+            const noiseScale = 0.05 * intensity;
+            const nX = this.simplex.noise3D(p.x * noiseScale, p.y * noiseScale, globalTime * 0.001);
+            const nY = this.simplex.noise3D(p.y * noiseScale, p.z * noiseScale, globalTime * 0.001);
+            const nZ = this.simplex.noise3D(p.z * noiseScale, p.x * noiseScale, globalTime * 0.001);
+            
+            fx += nX * 5.0 * intensity;
+            fy += nY * 5.0 * intensity;
+            fz += nZ * 5.0 * intensity;
+            
+            // Mise à jour de la vitesse
+            p.vx += fx * deltaTime * 60;
+            p.vy += fy * deltaTime * 60;
+            p.vz += fz * deltaTime * 60;
+            
+            // Limitation de la vitesse
+            const maxSpeed = 5.0 * intensity;
+            const speed = Math.sqrt(p.vx*p.vx + p.vy*p.vy + p.vz*p.vz);
+            if (speed > maxSpeed) {
+                p.vx *= maxSpeed / speed;
+                p.vy *= maxSpeed / speed;
+                p.vz *= maxSpeed / speed;
+            }
+            
+            // Mise à jour de la position
+            p.x += p.vx * deltaTime * 60;
+            p.y += p.vy * deltaTime * 60;
+            p.z += p.vz * deltaTime * 60;
+            
+            // Vieillissement et énergie
+            p.age += deltaTime * 10;
+            p.energy = Math.min(1, p.energy + deltaTime * 0.01 * intensity);
+            
+            // Comportement spécifique pour les particules sur les boucles
+            if (p.type === 'loop') {
+                const loop = this.magneticLoops[p.loopIdx];
+                p.progress += deltaTime * loop.speed * (1 + intensity * 0.5);
+                if (p.progress > 1.0) p.progress = 0;
+                
+                const point = loop.curve.getPoint(p.progress);
+                const tangent = loop.curve.getTangent(p.progress);
+                const normal = new THREE.Vector3(0, 1, 0).cross(tangent).normalize();
+                const binormal = tangent.clone().cross(normal).normalize();
+                
+                const angle = p.progress * Math.PI * 2 * loop.twist + globalTime * 0.006 * bpm;
+                const radius = 1.0 * (1.0 - Math.pow(p.progress - 0.5, 2) * 3.4) * intensity;
+                
+                p.x = point.x + (normal.x * Math.cos(angle) + binormal.x * Math.sin(angle)) * radius;
+                p.y = point.y + (normal.y * Math.cos(angle) + binormal.y * Math.sin(angle)) * radius;
+                p.z = point.z + (normal.z * Math.cos(angle) + binormal.z * Math.sin(angle)) * radius;
+                
+                // Synchronisation avec la boucle
+                p.vx = tangent.x * loop.speed * 2;
+                p.vy = tangent.y * loop.speed * 2;
+                p.vz = tangent.z * loop.speed * 2;
+            }
+            
+            // Taille dynamique
+            p.size = 0.05 + Math.sin(p.age * 0.01 * bpm) * 0.03 + p.energy * 0.05 * intensity;
+            
+            // Limites de l'espace
+            const maxDist = ACCELERANDO_CONFIG.starRadius * 5 * intensity;
+            const dist = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+            if (dist > maxDist) {
+                p.x *= maxDist / dist;
+                p.y *= maxDist / dist;
+                p.z *= maxDist / dist;
+                p.vx *= -0.3;
+                p.vy *= -0.3;
+                p.vz *= -0.3;
+            }
+            
+            // Éjections aléatoires (éruptions solaires)
+            if (Math.random() < 0.0005 * deltaTime * 60 * intensity && p.energy > 0.8) {
+                p.vx += (Math.random() - 0.5) * 5 * intensity;
+                p.vy += (Math.random() - 0.5) * 5 * intensity;
+                p.vz += (Math.random() - 0.5) * 5 * intensity;
+                p.energy = 0.1;
+            }
+            
+            // Changement de couleur aléatoire
+            if (Math.random() < 0.001 * deltaTime * 60 * intensity) {
+                const palette = ACCELERANDO_CONFIG.palettes[0].colors;
+                p.color = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
+            }
+        }
+        
+        this.updateGeometry();
+    }
+    
+    changePalette(index) {
+        const palette = ACCELERANDO_CONFIG.palettes[index % ACCELERANDO_CONFIG.palettes.length];
+        this.material.uniforms.uGlowColor.value = new THREE.Color(palette.glow);
+        
+        for (let i = 0; i < this.count; i++) {
+            if (Math.random() < 0.3) {
+                this.particles[i].color = new THREE.Color(palette.colors[Math.floor(Math.random() * palette.colors.length)]);
+            }
+        }
+    }
+    
+    perturb() {
+        for (let i = 0; i < this.count; i++) {
+            const p = this.particles[i];
+            p.vx += (Math.random() - 0.5) * 2;
+            p.vy += (Math.random() - 0.5) * 2;
+            p.vz += (Math.random() - 0.5) * 2;
+            p.energy = Math.min(1, p.energy + 0.5);
+        }
+    }
+    
+    getGeometry() { return this.geometry; }
+    getMesh() { return this.mesh; }
+    getMagneticLoops() { return this.magneticLoops; }
+}
+
+// ============================================
+// COEUR SOLAIRE (Étoile centrale)
+// ============================================
+class SolarCore {
+    constructor(scene) {
+        this.scene = scene;
+        this.group = new THREE.Group();
+        this.simplex = SimplexNoise();
+        
+        this.createCore();
+        scene.add(this.group);
+    }
+    
+    createCore() {
+        // Noyau interne sombre
+        const innerGeo = new THREE.SphereGeometry(ACCELERANDO_CONFIG.starRadius * 0.92, 64, 64);
+        const innerMat = new THREE.MeshBasicMaterial({
+            color: 0x180302
+        });
+        const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+        this.group.add(innerMesh);
+        
+        // Glow principal
+        const glowGeo = new THREE.SphereGeometry(ACCELERANDO_CONFIG.starRadius * 1.06, 64, 64);
+        const glowMat = new THREE.ShaderMaterial({
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPos.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPos;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                
+                uniform float uTime;
+                uniform float uIntensity;
+                uniform vec3 uGlowColor;
+                
+                void main() {
+                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                    float intensity = pow(0.72 - dot(vNormal, viewDir), 3.2);
+                    
+                    vec3 colCore = uGlowColor;
+                    vec3 colRim = vec3(0.5, 0.04, 0.15);
+                    vec3 finalColor = mix(colCore, colRim, intensity);
+                    
+                    // Pulsation synchronisée
+                    float pulse = 1.0 + sin(uTime * 2.5 + uTime * uIntensity * 0.5) * 0.2;
+                    finalColor *= pulse;
+                    
+                    gl_FragColor = vec4(finalColor, intensity * 0.82 * uIntensity);
+                }
+            `,
+            uniforms: {
+                uTime: { value: 0 },
+                uIntensity: { value: 1.0 },
+                uGlowColor: { value: new THREE.Color(0xff2ced) }
+            },
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide,
+            transparent: true
+        });
+        this.glowMesh = new THREE.Mesh(glowGeo, glowMat);
+        this.group.add(this.glowMesh);
+        
+        // Lueur supplémentaire
+        const outerGlowGeo = new THREE.SphereGeometry(ACCELERANDO_CONFIG.starRadius * 1.5, 64, 64);
+        const outerGlowMat = new THREE.ShaderMaterial({
+            vertexShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPos.xyz;
+                    gl_Position = projectionMatrix * viewMatrix * worldPos;
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vNormal;
+                varying vec3 vWorldPosition;
+                
+                uniform float uTime;
+                uniform float uIntensity;
+                
+                void main() {
+                    vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+                    float intensity = pow(0.5 - dot(vNormal, viewDir), 2.0);
+                    
+                    // Couleurs néon
+                    vec3 color1 = vec3(0.0, 1.0, 1.0);
+                    vec3 color2 = vec3(1.0, 0.0, 1.0);
+                    vec3 finalColor = mix(color1, color2, sin(uTime * 0.5) * 0.5 + 0.5);
+                    
+                    gl_FragColor = vec4(finalColor, intensity * 0.3 * uIntensity);
+                }
+            `,
+            uniforms: {
+                uTime: { value: 0 },
+                uIntensity: { value: 1.0 }
+            },
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide,
+            transparent: true
+        });
+        this.outerGlowMesh = new THREE.Mesh(outerGlowGeo, outerGlowMat);
+        this.group.add(this.outerGlowMesh);
+    }
+    
+    update(time, intensity, bpm, palette) {
+        this.glowMesh.material.uniforms.uTime.value = time * 0.001;
+        this.glowMesh.material.uniforms.uIntensity.value = intensity;
+        this.glowMesh.material.uniforms.uGlowColor.value = new THREE.Color(palette.glow);
+        
+        this.outerGlowMesh.material.uniforms.uTime.value = time * 0.001;
+        this.outerGlowMesh.material.uniforms.uIntensity.value = intensity;
+        
+        // Pulsation du coeur
+        const pulse = 1.0 + Math.sin(time * 0.002 * bpm) * 0.03 * intensity;
+        this.group.scale.set(pulse, pulse, pulse);
+        
+        // Rotation lente
+        this.group.rotation.y += 0.0001 * bpm * 0.001;
+    }
+}
+
+// ============================================
+// MOTEUR PRINCIPAL
+// ============================================
+class AccelerandoSimulation {
+    constructor() {
+        this.container = document.getElementById('canvas-container');
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.controls = null;
+        this.composer = null;
+        
+        this.phaseManager = null;
+        this.genome = null;
+        this.memory = null;
+        this.particleSystem = null;
+        this.solarCore = null;
+        
+        this.paletteIndex = 0;
+        this.isPaused = false;
+        this.globalTime = 0;
+        this.lastTime = 0;
+        this.frameCount = 0;
+        this.fpsTime = 0;
+        
+        this.init();
+    }
+    
+    init() {
+        // Vérifier mobile
+        const isMobile = window.matchMedia('(max-width: 800px)').matches;
+        if (isMobile) {
+            ACCELERANDO_CONFIG.particleCount = Math.floor(ACCELERANDO_CONFIG.particleCount * 0.4);
+        }
+        
+        this.initThreeJS();
+        this.phaseManager = new AccelerandoPhaseManager();
+        this.genome = new Genome();
+        this.memory = new MemorySystem();
+        this.particleSystem = new HybridParticleSystem(this.genome, ACCELERANDO_CONFIG.particleCount, this.phaseManager);
+        this.scene.add(this.particleSystem.getMesh());
+        
+        this.solarCore = new SolarCore(this.scene);
+        
+        this.initPostProcessing();
+        this.initControls();
+        this.updateUI();
+        
+        // Masquer le chargement
+        document.getElementById('loading').style.display = 'none';
+        
+        this.animate();
+    }
+    
+    initThreeJS() {
+        this.scene = new THREE.Scene();
+        this.scene.fog = new THREE.FogExp2(
+            ACCELERANDO_CONFIG.palettes[0].fog, 
+            0.002
+        );
+        this.scene.background = new THREE.Color(ACCELERANDO_CONFIG.palettes[0].fog);
+        
+        this.camera = new THREE.PerspectiveCamera(
+            60, 
+            window.innerWidth / window.innerHeight, 
+            0.1, 
+            1000
+        );
+        this.camera.position.set(0, 0, 80);
+        
+        this.renderer = new THREE.WebGLRenderer({
+            antialias: true, 
+            powerPreference: "high-performance",
+            alpha: false
+        });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.2;
+        this.container.appendChild(this.renderer.domElement);
+        
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        this.controls.maxDistance = 200;
+        this.controls.minDistance = 20;
+        this.controls.autoRotate = true;
+        this.controls.autoRotateSpeed = 0.5;
+        
+        // Lumière
+        const ambient = new THREE.AmbientLight(
+            ACCELERANDO_CONFIG.palettes[0].ambient, 
+            0.5
+        );
+        this.scene.add(ambient);
+        
+        window.addEventListener('resize', () => {
+            this.camera.aspect = window.innerWidth / window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            
+            if (this.composer) {
+                this.composer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    }
+    
+    initPostProcessing() {
+        // Effect Composer pour les effets de post-processing
+        this.composer = new THREE.EffectComposer(this.renderer);
+        
+        // Render Pass
+        const renderPass = new THREE.RenderPass(this.scene, this.camera);
+        this.composer.addPass(renderPass);
+        
+        // Unreal Bloom Pass (effet de glow)
+        const bloomPass = new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5, // strength
+            0.4, // radius
+            0.85  // threshold
+        );
+        this.composer.addPass(bloomPass);
+        
+        // Copy Pass final
+        const copyPass = new THREE.ShaderPass(THREE.CopyShader);
+        copyPass.renderToScreen = true;
+        this.composer.addPass(copyPass);
+    }
+    
+    initControls() {
+        document.getElementById('btn-play-pause').onclick = () => {
+            this.isPaused = !this.isPaused;
+            this.phaseManager.togglePlayPause();
+            const btn = document.getElementById('btn-play-pause');
+            btn.textContent = this.isPaused ? '▶' : '⏸';
+        };
+        
+        document.getElementById('btn-reset').onclick = () => {
+            this.reset();
+        };
+        
+        document.getElementById('btn-boost').onclick = () => {
+            this.phaseManager.boost();
+            this.particleSystem.perturb();
+        };
+        
+        document.getElementById('btn-palette').onclick = () => {
+            this.paletteIndex = (this.paletteIndex + 1) % ACCELERANDO_CONFIG.palettes.length;
+            const palette = ACCELERANDO_CONFIG.palettes[this.paletteIndex];
+            this.scene.fog.color.setHex(palette.fog);
+            this.scene.background.setHex(palette.fog);
+            this.particleSystem.changePalette(this.paletteIndex);
+        };
+        
+        document.getElementById('btn-info').onclick = () => {
+            const ui = document.getElementById('accelerando-ui');
+            ui.style.display = ui.style.display === 'none' ? 'block' : 'none';
+        };
+        
+        // Raccourcis clavier
+        document.onkeydown = (e) => {
+            if (e.key === ' ') {
+                this.isPaused = !this.isPaused;
+                this.phaseManager.togglePlayPause();
+                const btn = document.getElementById('btn-play-pause');
+                btn.textContent = this.isPaused ? '▶' : '⏸';
+            } else if (e.key === 'r' || e.key === 'R') {
+                this.reset();
+            } else if (e.key === 'b' || e.key === 'B') {
+                this.phaseManager.boost();
+                this.particleSystem.perturb();
+            } else if (e.key === 'p' || e.key === 'P') {
+                this.paletteIndex = (this.paletteIndex + 1) % ACCELERANDO_CONFIG.palettes.length;
+                const palette = ACCELERANDO_CONFIG.palettes[this.paletteIndex];
+                this.scene.fog.color.setHex(palette.fog);
+                this.scene.background.setHex(palette.fog);
+                this.particleSystem.changePalette(this.paletteIndex);
+            } else if (e.key === 'i' || e.key === 'I') {
+                const ui = document.getElementById('accelerando-ui');
+                ui.style.display = ui.style.display === 'none' ? 'block' : 'none';
+            }
+        };
+        
+        // Clic sur le rendu
+        this.renderer.domElement.onclick = () => {
+            this.particleSystem.perturb();
+        };
+    }
+    
+    reset() {
+        this.scene.remove(this.particleSystem.getMesh());
+        this.genome = new Genome();
+        this.memory = new MemorySystem();
+        this.phaseManager.reset();
+        this.particleSystem = new HybridParticleSystem(
+            this.genome, 
+            ACCELERANDO_CONFIG.particleCount, 
+            this.phaseManager
+        );
+        this.scene.add(this.particleSystem.getMesh());
+    }
+    
+    updateUI() {
+        const phase = this.phaseManager.getCurrentPhase();
+        const bpm = this.phaseManager.getBPM();
+        const acceleration = this.phaseManager.getAccelerationProgress();
+        
+        document.getElementById('bpm-display').textContent = 'BPM: ' + bpm;
+        document.getElementById('phase-display').textContent = 'Phase: ' + phase.name;
+        document.getElementById('acceleration-fill').style.width = (acceleration * 100) + '%';
+        document.getElementById('particle-count').textContent = ACCELERANDO_CONFIG.particleCount;
+        document.getElementById('energy-value').textContent = Math.round(this.phaseManager.getIntensity() * 100) + '%';
+    }
+    
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        
+        const now = Date.now();
+        const deltaTime = Math.min(0.1, (now - this.lastTime) / 1000);
+        this.lastTime = now;
+        this.globalTime += deltaTime * 1000;
+        
+        // Mettre à jour le gestionnaire de phases
+        this.phaseManager.update();
+        
+        if (!this.isPaused) {
+            const bpm = this.phaseManager.getBPM();
+            const intensity = this.phaseManager.getIntensity();
+            const palette = ACCELERANDO_CONFIG.palettes[this.paletteIndex];
+            
+            // Mettre à jour le système de particules
+            this.particleSystem.update(deltaTime, this.globalTime);
+            
+            // Mettre à jour le coeur solaire
+            this.solarCore.update(this.globalTime, intensity, bpm, palette);
+            
+            // Mettre à jour l'interface
+            this.updateUI();
+            
+            // Rotation automatique de la caméra (synchronisée avec le BPM)
+            this.controls.autoRotateSpeed = 0.1 + (bpm / 60) * 0.05;
+        }
+        
+        this.controls.update();
+        
+        // Calcul des FPS
+        this.frameCount++;
+        if (now - this.fpsTime >= 1000) {
+            document.getElementById('fps-value').textContent = this.frameCount;
+            this.frameCount = 0; this.fpsTime = now;
+        }
+        
+        // Rendu avec post-processing
+        if (this.composer) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+}
+
+// ============================================
+// DÉMARRAGE
+// ============================================
+try {
+    new AccelerandoSimulation();
+} catch (error) {
+    console.error('Erreur critique:', error);
+    document.getElementById('loading').innerHTML = '
+        <div style="color:#ff4444; font-size: 18px;">Erreur: ' + error.message + '</div>
+        <div style="color:#aaaaaa; font-size: 14px; margin-top: 10px;">
+            Vérifiez votre connexion ou désactivez les bloquers de scripts.
+        </div>
+    ';
+}
+    </script>
+</body>
+</html>
